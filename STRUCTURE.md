@@ -1,4 +1,7 @@
-# Project Structure: The Gauntlet (Dungeons)
+# Project KEEPER: Keeping End-to-End Paranoia in Engine Reliability
+*(Domain variant: Keeping End-to-End Paranoia in Engine **Rendering**)*
+
+This repository contains the architecture, agent specifications, verification traps, and engine prototypes for Project **KEEPER**.
 
 ```
 ~/Sources/Dungeons/

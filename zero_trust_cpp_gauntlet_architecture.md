@@ -1,5 +1,9 @@
-# The Gauntlet: Autonomous Zero-Trust C++ Rendering Pipeline
-## Architectural Specification & Operational Framework (Enhanced Edition)
+# Project KEEPER: Keeping End-to-End Paranoia in Engine Reliability
+*(Alternative domain variant: Keeping End-to-End Paranoia in Engine **Rendering**)*
+
+> **KEEPER** is an autonomous, zero-trust C++ development pipeline built on the **Dungeon Keeper / Gauntlet** architecture. It shifts the human developer to an architectural arbitrator ("The Overgod") while AI agents and deterministic CI components autonomously write, attack, profile, and verify the codebase.
+
+---
 
 ---
 
