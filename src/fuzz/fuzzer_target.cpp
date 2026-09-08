@@ -1,3 +1,10 @@
+// =============================================================================
+// CONTINUOUS FUZZING ENTRY POINT (The Beholder)
+// =============================================================================
+// Consumes randomized, corrupted byte streams via LLVMFuzzerTestOneInput
+// to detect unhandled memory exceptions, crashes, and integer overflows 24/7.
+// =============================================================================
+
 #include <cstddef>
 #include <cstdint>
 #include <array>
@@ -15,7 +22,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         reinterpret_cast<const std::byte*>(data), size
     );
 
-    // Continuous fuzzing bombardment to detect crashes, UB, and heap-use-after-free
+    // Continuous fuzzing bombardment against the text shaper
     (void)shaper.shape_cluster(byte_span, glyph_buffer);
 
     return 0;

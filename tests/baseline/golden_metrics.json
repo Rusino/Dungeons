@@ -1,5 +1,6 @@
 [
   {
+    "_comment": "Golden layout measurement for UTF-8 run #1: Letter 'A' (cluster index 0, standard advance 12.5px)",
     "glyph_id": 100,
     "cluster": 0,
     "advance_x": 12.5,
@@ -8,6 +9,7 @@
     "offset_y": 0.0
   },
   {
+    "_comment": "Golden layout measurement for UTF-8 run #2: Letter 'B' after ZWJ sequence (cluster index 4, standard advance 12.5px)",
     "glyph_id": 101,
     "cluster": 4,
     "advance_x": 12.5,

@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""
-The Graveyard RAG Query Interface.
-Stores past failed code attempts, sanitizer stack traces, and compiler errors.
-Queries vector or hash-indexed failure patterns to inject negative prompts into The Artificer.
-"""
+# ==============================================================================
+# THE GRAVEYARD (Anti-Pattern RAG & Long-Term Memory)
+# ==============================================================================
+# Storing dead, defective code snippets, compiler errors, and sanitizer traces.
+# Before The Artificer generates new C++ implementations, it queries this script
+# to inject Negative Prompts (e.g. "Do not use std::string_view here; three days
+# ago it caused a heap-use-after-free"). This breaks circular agent reasoning.
+# ==============================================================================
 
 import json
 import sys
@@ -11,9 +14,11 @@ import os
 import sqlite3
 from typing import List, Dict
 
+# Local SQLite database path for failure records
 DB_PATH = os.path.join(os.path.dirname(__file__), "graveyard_db", "graveyard.sqlite3")
 
 def init_db():
+    """Initializes the local SQLite schema if it does not already exist."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
@@ -32,6 +37,7 @@ def init_db():
 
 def record_failure(feature_name: str, iteration: int, failed_code: str,
                    error_category: str, error_log: str, negative_lesson: str):
+    """Records a new failure into the Graveyard database."""
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("""
@@ -41,6 +47,7 @@ def record_failure(feature_name: str, iteration: int, failed_code: str,
         conn.commit()
 
 def query_negative_prompts(feature_name: str, top_k: int = 3) -> List[str]:
+    """Queries the most recent negative lessons learned for a given feature."""
     init_db()
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
@@ -54,12 +61,13 @@ def query_negative_prompts(feature_name: str, top_k: int = 3) -> List[str]:
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "record":
-        # Example record usage
+        # Example record usage: record <feature>
         feature = sys.argv[2] if len(sys.argv) > 2 else "generic"
-        record_failure(feature, 1, "// failed code", "Sanitizer/ASan", "heap-use-after-free",
+        record_failure(feature, 1, "// failed code snippet", "Sanitizer/ASan", "heap-use-after-free",
                        "Do not return std::string_view pointing to temporary stack buffers.")
         print("Failure recorded.")
     else:
+        # Default query usage: return JSON formatted negative constraints
         feature = sys.argv[1] if len(sys.argv) > 1 else "generic"
         lessons = query_negative_prompts(feature)
         print(json.dumps({"feature": feature, "negative_constraints": lessons}, indent=2))

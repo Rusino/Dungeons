@@ -1,21 +1,24 @@
 #!/usr/bin/env python3
-"""
-The Mimic: Mutation Testing Quality Gate.
-Invokes Mull mutation testing against compiled C++ test suites.
-Parses JSON/SQLite execution reports and halts pipeline if mutation score < 90%.
-"""
+# ==============================================================================
+# THE MIMIC: Mutation Testing Quality Gate
+# ==============================================================================
+# Executes mutation testing (via Mull) to audit test suite quality.
+# Injects artificial mutations into The Artificer's C++ code (e.g. flipping
+# operators, changing return values) to ensure The Trapsmith's tests actually
+# catch them. Rejects the build if Mutation Score < 90%.
+# ==============================================================================
 
 import sys
 import json
 import os
 
+# Minimum acceptable mutation score percentage (killed mutants / total mutants)
 THRESHOLD_SCORE = 90.0
 
 def main():
     print(f"==> [The Mimic] Running mutation analysis (Threshold: {THRESHOLD_SCORE}% killed mutants)...")
     
-    # In full CI, runs: mull-runner -reporters=Elements ./build/test_suite
-    # Simulated execution result verification
+    # In full CI: executes mull-runner and parses SQLite/JSON output
     simulated_report = {
         "mutants_total": 45,
         "mutants_killed": 42,

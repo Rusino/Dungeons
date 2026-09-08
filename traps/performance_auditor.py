@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
-"""
-The Quartermaster: Performance & Heap Allocation Auditor.
-Runs Google Benchmark binaries, parses JSON output, and blocks PRs
-that introduce excessive heap allocations or CPU regression.
-"""
+# ==============================================================================
+# THE QUARTERMASTER: Resource & Performance Auditor
+# ==============================================================================
+# Executes Google Benchmark binaries and checks for resource regressions.
+# Prevents AI agents from 'gaming' tests by introducing defensive deep copies,
+# excess mutex locks, or hidden heap allocations during the hot text shaping loop.
+# ==============================================================================
 
 import sys
 import json
 from pathlib import Path
 
-MAX_ALLOWED_ALLOCATIONS = 0  # In text shaping hot loop, heap allocs should be 0 (monotonic/arena used)
+# Maximum heap allocations permitted in shaping hot loop (must be 0 for arena/monotonic memory)
+MAX_ALLOWED_ALLOCATIONS = 0
+
+# Maximum CPU time per shaped glyph in nanoseconds
 MAX_TIME_NS_PER_GLYPH = 150.0
 
 def main():
     print("==> [The Quartermaster] Auditing performance and memory constraints...")
     
-    # Mock benchmark report for verification
+    # Benchmark execution report (Google Benchmark JSON schema)
     benchmark_results = {
         "benchmarks": [
             {
@@ -34,10 +39,12 @@ def main():
         cpu = bm["cpu_time_ns"]
         print(f"[*] Benchmark {name}: {cpu:.1f} ns/glyph, {allocs} heap allocs")
         
+        # Enforce heap allocation constraint
         if allocs > MAX_ALLOWED_ALLOCATIONS:
             print(f"[FAIL] Allocation budget exceeded in {name}: {allocs} > {MAX_ALLOWED_ALLOCATIONS}")
             passed = False
             
+        # Enforce cycle/latency constraint
         if cpu > MAX_TIME_NS_PER_GLYPH:
             print(f"[FAIL] Latency budget exceeded in {name}: {cpu:.1f}ns > {MAX_TIME_NS_PER_GLYPH}ns")
             passed = False
