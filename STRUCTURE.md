@@ -4,25 +4,35 @@
 ~/Sources/Dungeons/
 ├── zero_trust_cpp_gauntlet_architecture.md   # Architectural blueprint
 ├── STRUCTURE.md                              # This structure reference file
+├── go.mod                                    # Go module definition (go 1.22+)
+│
 ├── .antigravity/                             # Orchestration & Agent Constraints
-│   ├── gauntlet_graph.py                     # Master execution graph and tiered runner
+│   ├── gauntlet_graph.py                     # Master execution graph (Python)
+│   ├── gauntlet_graph.go                     # Master execution graph (Go equivalent)
 │   ├── safety_policies.json                  # Immutable agent permissions matrix
 │   ├── memory/
 │   │   ├── graveyard_db/                     # Failure history storage
-│   │   └── graveyard_query.py                # Negative prompt extraction & storage script
+│   │   ├── graveyard_query.py                # Negative prompt extraction & RAG (Python)
+│   │   └── graveyard_query.go                # Negative prompt extraction & RAG (Go equivalent)
 │   └── prompts/                              # Agent Personas
 │       ├── architect_system.md               # Contract & C++20 concept rules
 │       ├── artificer_system.md               # Implementation constraints
 │       ├── trapsmith_system.md               # Red team adversarial test rules
 │       ├── scavenger_system.md               # Open-source search & SPDX checks
 │       └── deadlock_analyst.md               # Diagnostic generator for Overgod escalation
+│
 ├── traps/                                    # Deterministic CI Traps (Read-Only)
-│   ├── sanitize_matrix.sh                    # ASan/UBSan, TSan, and MSan matrix runner
-│   ├── cartographer_delta.py                 # Numerical HarfBuzz layout metric verifier
-│   ├── mutation_gate.py                      # Mull mutation testing auditor (>= 90%)
-│   └── performance_auditor.py                # Google Benchmark cycle & heap auditor
+│   ├── sanitize_matrix.sh                    # ASan/UBSan, TSan, and MSan matrix runner (Bash)
+│   ├── cartographer_delta.py                 # Numerical layout metric verifier (Python)
+│   ├── cartographer_delta.go                 # Numerical layout metric verifier (Go equivalent)
+│   ├── mutation_gate.py                      # Mull mutation testing auditor (Python)
+│   ├── mutation_gate.go                      # Mull mutation testing auditor (Go equivalent)
+│   ├── performance_auditor.py                # Google Benchmark cycle & heap auditor (Python)
+│   └── performance_auditor.go                # Google Benchmark cycle & heap auditor (Go equivalent)
+│
 ├── docs/rfcs/                                # Human RFCs (The Overgod)
 │   └── RFC_001_Zero_Width_Joiner.md          # Sample spec for ZWJ complex shaping
+│
 ├── src/                                      # C++ Engine Core
 │   ├── CMakeLists.txt                        # Hardened build config with -Werror
 │   ├── engine/
@@ -30,6 +40,7 @@
 │   │   └── text_shaper.cpp                   # The Artificer's zero-allocation implementation
 │   └── fuzz/
 │       └── fuzzer_target.cpp                 # The Beholder libFuzzer entry point
+│
 └── tests/
     ├── baseline/
     │   └── golden_metrics.json               # The Cartographer golden metrics
