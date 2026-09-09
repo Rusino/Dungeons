@@ -187,18 +187,41 @@ When Project KEEPER is applied to existing production codebases (e.g., `modules/
    - The Artificer is blocked by `safety_policies.json` from modifying code unless a pre-flight pinning token exists confirming that tests have captured the baseline behavior on unmodified code.
 
 
-### 3.2 The 4-State Mutation-Verified Pinning Protocol (The Mimic & Trapsmith Gate)
+### 3.2 The Dual-Gate Mutation Protocol (The Mimic)
 
-To eliminate "ghost tests" (tests that pass trivially via silent early returns, missing flags, or tautological assertions), all legacy characterization and refactoring changes MUST satisfy the **4-State Verification Matrix**:
+Rather than running solely at the end of the pipeline, **The Mimic** executes as two distinct quality gates to eliminate wasted repair cycles:
 
-| State | Target Code | Code Invariant | Expected Test Result | Architectural Proof |
-| :---: | :---: | :---: | :---: | :--- |
-| **State 1** | **Unmodified Baseline** | Clean (No Mutation) | 🟢 **PASS** | Validates baseline output and proves test compiles against existing interfaces. |
-| **State 2** | **Unmodified Baseline** | Mutated (The Mimic) | 🔴 **FAIL** | **Sensitivity Proof**: Proves test actually executes, reaches assertions, and catches logic errors (defeats silent skips / missing test data). |
-| **State 3** | **Refactored Code** | Clean (Refactored) | 🟢 **PASS** | Validates behavioral equivalence and numerical invariance against baseline. |
-| **State 4** | **Refactored Code** | Mutated (The Mimic) | 🔴 **FAIL** | **Survivability Proof**: Proves refactored code did not decouple or bypass the invariants that the test suite enforces. |
+```
+                  [Pre-Flight Verification]
+                 The Trapsmith writes tests
+                             │
+                             ▼
+                  State 1: Test(Unmodified)  == PASS
+                             │
+                             ▼
+                  [The Mimic: Gate A (Pre-Flight)]
+                  State 2: Test(Mutated_Orig) == FAIL
+                  (Sensitivity Proof: Rejects ghost tests before Artificer touches code)
+                             │
+                             ▼
+                 [Implementation Verification]
+                  The Artificer refactors code
+                             │
+                             ▼
+                  State 3: Test(Refactored)   == PASS
+                             │
+                             ▼
+                  [The Mimic: Gate B (Post-Flight)]
+                  State 4: Test(Mutated_Ref)  == FAIL
+                  (Survivability Proof: Confirms refactor preserved invariant enforcement)
+                             │
+                             ▼
+                      [The Acid Pit]
+                  (ASan / UBSan / Matrix)
+```
 
-**Hard Pipeline Rule**: If State 2 or State 4 produces a PASS, the test suite is REJECTED by The Mimic as vacuous or disabled.
+- **The Mimic Gate A (Pre-Flight)**: Evaluates **The Trapsmith's tests** against mutated baseline code. If mutants survive, the test harness is rejected before The Artificer writes a single line.
+- **The Mimic Gate B (Post-Flight)**: Evaluates **The Artificer's implementation** against mutated refactored code. If mutants survive, the refactor is rejected for bypassing invariant enforcement.
 
 ## 4. Contract Engineering (The Architect's Protocol)
 
