@@ -186,6 +186,20 @@ When Project KEEPER is applied to existing production codebases (e.g., `modules/
 2. **Mandatory Pre-Flight Pinning**:
    - The Artificer is blocked by `safety_policies.json` from modifying code unless a pre-flight pinning token exists confirming that tests have captured the baseline behavior on unmodified code.
 
+
+### 3.2 The 4-State Mutation-Verified Pinning Protocol (The Mimic & Trapsmith Gate)
+
+To eliminate "ghost tests" (tests that pass trivially via silent early returns, missing flags, or tautological assertions), all legacy characterization and refactoring changes MUST satisfy the **4-State Verification Matrix**:
+
+| State | Target Code | Code Invariant | Expected Test Result | Architectural Proof |
+| :---: | :---: | :---: | :---: | :--- |
+| **State 1** | **Unmodified Baseline** | Clean (No Mutation) | 🟢 **PASS** | Validates baseline output and proves test compiles against existing interfaces. |
+| **State 2** | **Unmodified Baseline** | Mutated (The Mimic) | 🔴 **FAIL** | **Sensitivity Proof**: Proves test actually executes, reaches assertions, and catches logic errors (defeats silent skips / missing test data). |
+| **State 3** | **Refactored Code** | Clean (Refactored) | 🟢 **PASS** | Validates behavioral equivalence and numerical invariance against baseline. |
+| **State 4** | **Refactored Code** | Mutated (The Mimic) | 🔴 **FAIL** | **Survivability Proof**: Proves refactored code did not decouple or bypass the invariants that the test suite enforces. |
+
+**Hard Pipeline Rule**: If State 2 or State 4 produces a PASS, the test suite is REJECTED by The Mimic as vacuous or disabled.
+
 ## 4. Contract Engineering (The Architect's Protocol)
 
 To reduce agent debugging iterations, constraints are enforced via **C++20 Type System Invariants** rather than runtime checks alone:

@@ -105,7 +105,8 @@
       "_comment_max_heap_allocations": "Heap allocation limit in hot path text shaping (monotonic/arena must be used).",
       "max_heap_allocations_per_glyph": 0,
       "strict_cxx_standard": "c++20",
-      "preflight_pinning_required": true
+      "preflight_pinning_required": true,
+      "require_four_state_mutation_verification": true
     }
   }
 }
