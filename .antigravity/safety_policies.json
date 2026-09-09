@@ -82,7 +82,12 @@
         ]
       }
     },
-        "The_Acid_Pit": {
+            "The_Imps": {
+        "_comment": "Build infrastructure and dependency pruners. Executes reverse-dependency lookups (e.g. gn refs) to run fast-gate targeted compiles on inner loops while reserving full integration builds for the outer gauntlet gate.",
+        "inner_loop_pruning_enabled": true,
+        "outer_loop_full_integration_required": true
+      },
+  "The_Acid_Pit": {
         "_comment": "Automated runtime sanitizer gate. Spawns isolated instrumented build passes (ASan, UBSan, TSan, MSan) via native build toolchains (GN/Ninja, CMake) and validates memory integrity under test execution.",
         "allowed_build_modes": [
           "ASan",
