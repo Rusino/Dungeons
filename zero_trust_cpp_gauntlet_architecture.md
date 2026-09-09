@@ -127,6 +127,65 @@ Clang runtimes prohibit linking conflicting sanitizers simultaneously:
 
 ---
 
+
+
+---
+
+## 3.1 Legacy Refactoring & Dead-Code Elimination Protocol (The "Pin-First" Loop)
+
+When Project KEEPER is applied to existing production codebases (e.g., `modules/skparagraph/src/`) rather than greenfield features, the pipeline switches to a **Pin-First Verification Loop**:
+
+```
+                       [The Overgod (Human)]
+                     Issues Refactoring RFC
+                                │
+                                ▼
+                     [The Scavenger / Auditor]
+       Scans codebase via static analysis (Clang DeadStores / Diagnostics).
+       Identifies candidate dead lines strictly inside method bodies.
+                                │
+                                ▼
+                         [The Architect]
+       Formulates "Safe Refactoring Contract":
+       - Invariant: Zero deletions or modifications of method signatures,
+         virtual interfaces, or class fields (protecting external consumers).
+       - Mandates pre-flight characterization test requirements.
+                                │
+                                ▼
+                 [The Trapsmith (Pre-Flight Phase)]
+       BEFORE any code is modified, writes "Pinning Tests":
+       - Executes target functions across diverse edge cases.
+       - Captures and locks the exact baseline output (geometry, metrics, state).
+       - Confirms 100% test pass on unmodified code.
+                                │
+                                ▼
+                         [The Artificer]
+       Executes surgical deletion of the dead lines ONLY after
+       The Trapsmith's baseline token is issued.
+                                │
+                                ▼
+                     [The Gauntlet Traps]
+       1. The Acid Pit: Reruns test suite under ASan/UBSan.
+       2. The Cartographer: Reruns The Trapsmith's pinning tests,
+          asserting 0.0000% delta against the pre-deletion baseline.
+                                │
+                 ┌──────────────┴──────────────┐
+              [Pass]                        [Fail]
+                 │                             │
+                 │              [Hidden Side Effect Detected!]
+                 │              - Deletion reverted.
+                 │              - Recorded in The Graveyard as negative constraint.
+                 ▼                             │
+       [The Overgod (You)] ◄───────────────────┘
+       Final review of diff & merge approval.
+```
+
+### Invariants for Legacy Code
+1. **Preserve External Consumer Callers**:
+   - Never remove, rename, or change the visibility of any method or struct member (even private ones), ensuring compatibility with tools that inspect internals (e.g., JetBrains).
+2. **Mandatory Pre-Flight Pinning**:
+   - The Artificer is blocked by `safety_policies.json` from modifying code unless a pre-flight pinning token exists confirming that tests have captured the baseline behavior on unmodified code.
+
 ## 4. Contract Engineering (The Architect's Protocol)
 
 To reduce agent debugging iterations, constraints are enforced via **C++20 Type System Invariants** rather than runtime checks alone:
