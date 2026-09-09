@@ -82,7 +82,17 @@
         ]
       }
     },
-    "execution_constraints": {
+        "The_Acid_Pit": {
+        "_comment": "Automated runtime sanitizer gate. Spawns isolated instrumented build passes (ASan, UBSan, TSan, MSan) via native build toolchains (GN/Ninja, CMake) and validates memory integrity under test execution.",
+        "allowed_build_modes": [
+          "ASan",
+          "UBSan",
+          "TSan",
+          "MSan"
+        ],
+        "hard_fail_on_sanitizer_error": true
+      },
+  "execution_constraints": {
       "_comment_max_retries": "Number of autonomous self-healing iterations before escalating to The Overgod (Human).",
       "max_retries": 5,
       "_comment_mutation_score_threshold": "Minimum percentage of mutants that must be caught/killed by The Trapsmith's test suite.",
