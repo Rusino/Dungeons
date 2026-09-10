@@ -227,6 +227,42 @@ Rather than running solely at the end of the pipeline, **The Mimic** executes as
 - **The Mimic Gate A (Pre-Flight)**: Evaluates **The Trapsmith's tests** against mutated baseline code. If mutants survive, the test harness is rejected before The Artificer writes a single line.
 - **The Mimic Gate B (Post-Flight)**: Evaluates **The Artificer's implementation** against mutated refactored code. If mutants survive, the refactor is rejected for bypassing invariant enforcement.
 
+
+### 3.3 The Three-Phase Inquisitor Audit Lifecycle
+
+**The Invariant Inquisitor** operates as an omnipresent constitutional gatekeeper across the pipeline:
+
+```
+[Phase 1: Pre-Spec] ────────► Grills The Overgod on RFC invariants (ABI, Memory, Concurrency)
+                                       │
+                                       ▼ (Invariants Locked)
+                             The Architect generates .hpp
+                                       │
+                                       ▼
+                             The Trapsmith writes tests
+                                       │
+                                       ▼
+[Phase 2: Post-Test] ───────► Grills The Trapsmith on Test Diff:
+                                - Detects tautological assertions.
+                                - Detects silent skips & unreached assert paths.
+                                - Validates adherence to contract preconditions.
+                                       │
+                                       ▼ (Tests Certified)
+                             The Mimic Gate A (Pre-Flight Mutation)
+                                       │
+                                       ▼
+                             The Artificer writes .cpp
+                                       │
+                                       ▼
+[Phase 3: Post-Code] ───────► Grills The Artificer on Code Diff:
+                                - Validates zero method/signature changes (JetBrains rule).
+                                - Catches hidden heap allocation workarounds.
+                                - Flags compiler warning suppressions (#pragma).
+                                       │
+                                       ▼ (Code Certified)
+                             The Gauntlet Traps (Acid Pit / Cartographer)
+```
+
 ## 4. Contract Engineering (The Architect's Protocol)
 
 To reduce agent debugging iterations, constraints are enforced via **C++20 Type System Invariants** rather than runtime checks alone:

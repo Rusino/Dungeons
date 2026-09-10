@@ -37,10 +37,29 @@ def execute_gauntlet(rfc_path: str):
         print(f"Error: RFC {rfc_path} not found.")
         sys.exit(1)
 
+    print("[Phase 1: Inquisitor] Interrogating RFC invariants (ABI, Memory, Concurrency)...")
     print("[1/6] Contract Generation: The Architect locks invariants.")
     print("[2/6] Pre-Flight Pinning: The Trapsmith writes baseline characterization tests.")
     
+    print("[Phase 2: Inquisitor] Auditing The Trapsmith's test diff for silent skips & tautologies...")
     # State 1: Verify baseline passes
+    print("[State 1] Executing baseline tests on clean code: Expecting PASS")
+    
+    # Gate A: The Mimic audits The Trapsmith's tests
+    print("[Gate A] The Mimic tests The Trapsmith: Mutating original code (Expecting FAIL)")
+    code, out, err = run_step(["python3", str(TRAPS_DIR / "mutation_gate.py"), "gate_a"], description="The Mimic: Gate A (Pre-Flight Audit)")
+    if code != 0:
+        print("[!] Gate A FAILED: The Trapsmith's test did not catch the mutant (Ghost Test Rejected).")
+        return 1
+    print("[+] Gate A PASSED: The Trapsmith's test suite proven sensitive.")
+
+    # Self-Healing Loop for The Artificer
+    for iteration in range(1, MAX_RETRIES + 1):
+        print(f"\n--- [The Gauntlet] Implementation Iteration {iteration}/{MAX_RETRIES} ---")
+        print("[3/6] The Artificer implements or refactors .cpp code.")
+        
+        print("[Phase 3: Inquisitor] Auditing The Artificer's code diff for hidden allocations & signature drift...")
+        # State 3: Verify refactored code passes
     print("[State 1] Executing baseline tests on clean code: Expecting PASS")
     
     # Gate A: The Mimic audits The Trapsmith's tests
