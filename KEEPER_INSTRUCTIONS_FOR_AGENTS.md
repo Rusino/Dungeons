@@ -153,3 +153,8 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
    Always verify whether tests rely on external assets (like font directories, test vectors, or network mocks). If a test uses a macro or skip logic like `SKIP_IF_NOT_FOUND`, ensure the required flags or resources are actively supplied so assertions actually run.
 3. **No Warning Suppressions**:
    Never allow `#pragma`, `-Wno-*`, `reinterpret_cast`, or arbitrary `@ts-ignore` directives to resolve compiler or linter errors.
+4. **The Domain Separation Audit (Algorithmic Purity)**:
+   The Invariant Inquisitor must verify that algorithms live strictly in their foundational domain layer, not where their results are consumed. Downstream consumer layers must never implement or duplicate foundational domain algorithms:
+   - Foundational domain algorithms (e.g. Unicode UAX #9 BiDi reordering, UAX #14 line break classification, UAX #29 segmentation) must be pure functions or methods of the **foundational layer** (e.g. Unicode Layer).
+   - Downstream layout/formatting layers must strictly perform geometry and placement math (advances, line heights, rects), querying the foundational layer for algorithmic permutations.
+   - Downstream query layers must strictly perform spatial search, indexing, and navigation traversal without re-executing foundational algorithms.

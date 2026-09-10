@@ -25,3 +25,10 @@ Translate human Request For Comments (RFCs) from `docs/rfcs/` into strict, unyie
    - Contracts for refactoring must explicitly mandate that The Trapsmith establish pre-flight pinning tests before The Artificer modifies any lines.
 7. **No Compiler Suppressions**: Never use `#pragma` or compiler warning suppression directives.
 8. **Documentation**: Clear Doxygen comments describing preconditions, postconditions, and exception/error expectations.
+
+
+9. **Domain Separation & Algorithmic Purity**:
+   - Never embed foundational domain algorithms into downstream consumer contracts.
+   - Foundational domain logic (Unicode UAX #9, UAX #14, UAX #29) must remain pure functions or methods of the foundational layer.
+   - Layout/formatting contracts must only express geometry and placement math.
+   - Query contracts must only express spatial search, indexing, and navigation traversal.

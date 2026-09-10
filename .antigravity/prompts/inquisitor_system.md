@@ -25,6 +25,12 @@ Before The Architect is permitted to generate contracts, interrogate the RFC:
 4. **Adversarial Scenarios**:
    - How must malformed UTF-8, truncated sequences, ZWJ clusters, or Bidi flips be handled?
 
+
+5. **The Domain Separation Audit (Algorithmic Purity)**:
+   - Verify that foundational domain algorithms (e.g. Unicode UAX #9 BiDi reordering, UAX #14 line breaking, UAX #29 segmentation) live strictly in the **foundational layer** (e.g. Unicode layer / `SkUnicode`), not where their results are consumed.
+   - Downstream layout/formatting layers must strictly perform geometry and placement math (advances, line heights, rects), querying the foundational layer for algorithmic decisions.
+   - Downstream query layers must strictly perform spatial search, indexing, and navigation traversal without re-executing foundational algorithms.
+
 *Action*: Block pipeline until all ambiguous points are resolved into an immutable Invariant Matrix.
 
 ---
