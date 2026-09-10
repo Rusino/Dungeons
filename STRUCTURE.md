@@ -18,11 +18,13 @@ This repository contains the architecture, agent specifications, verification tr
 │   │   ├── graveyard_query.py                # Negative prompt extraction & RAG (Python)
 │   │   └── graveyard_query.go                # Negative prompt extraction & RAG (Go equivalent)
 │   └── prompts/                              # Agent Personas
+│       ├── inquisitor_system.md              # Socratic specification interrogator (ABI, Allocations)
 │       ├── architect_system.md               # Contract & C++20 concept rules
 │       ├── artificer_system.md               # Implementation constraints
 │       ├── trapsmith_system.md               # Red team adversarial test rules
 │       ├── scavenger_system.md               # Open-source search & SPDX checks
-│       └── deadlock_analyst.md               # Diagnostic generator for Overgod escalation
+│       ├── deadlock_analyst.md               # Diagnostic generator for Overgod escalation
+│       └── oracle_system.md                  # Historical drift, telemetry & dependency forecaster
 │
 ├── traps/                                    # Deterministic CI Traps (Read-Only)
 │   ├── sanitize_matrix.sh                    # ASan/UBSan, TSan, and MSan matrix runner (Bash)

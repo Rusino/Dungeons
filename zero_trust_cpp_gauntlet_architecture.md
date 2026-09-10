@@ -20,6 +20,9 @@ The core philosophy shifts human engineers from writing and debugging low-level 
     [The Overgod (Human)]
             │
             ▼
+ [The Invariant Inquisitor] ──► Socratic C++ Systems Checklist (ABI, Memory, Concurrency)
+            │
+            ▼ (Invariants Locked)
    [The Architect (AI)] ──────► .hpp Contracts + C++20 Concepts
             │
       ┌─────┴────────────────────────────────┐
@@ -58,6 +61,7 @@ The core philosophy shifts human engineers from writing and debugging low-level 
 
 | Role | Entity Type | Responsibilities & Mechanics |
 | :--- | :--- | :--- |
+| **The Invariant Inquisitor** | AI Agent | Socratic specification auditor. Intercepts RFCs to interrogate The Overgod on hidden invariants: caller ABI stability (e.g. JetBrains constraints), zero-heap allocation budgets, reentrancy, and edge cases before The Architect writes contracts. |
 | **The Overgod** | Human (You) | System architect and final arbitrator. Writes high-level RFCs, resolves deadlocks when retries exhaust, and provides final sign-off on architectural elegance. |
 | **The Dungeon Master** | CI/CD Orchestrator | State manager (GitHub Actions / Antigravity Python graph). Dispatches jobs, routes artifacts/compiler logs, enforces safety policies, and handles step-failure transitions. |
 | **The Architect** | AI Agent | Translates RFCs into strict, compile-time verifiable C++20 contracts (`.hpp`). Mandates `std::span`, smart pointers, RAII, and C++20 Concepts before any logic is written. |

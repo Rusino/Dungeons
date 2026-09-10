@@ -13,7 +13,26 @@
       "*.sh"
     ],
     "agent_permissions": {
-      "The_Architect": {
+            "The_Invariant_Inquisitor": {
+        "_comment": "Specification interrogator. Intercepts RFCs before contract generation and enforces the systems checklist (ABI stability, allocation budget, thread safety).",
+        "allowed_write_patterns": [
+          "docs/rfcs/*.md",
+          "docs/contracts/*.md"
+        ],
+        "allowed_read_patterns": [
+          "**"
+        ]
+      },
+      "The_Oracle": {
+        "_comment": "Long-term telemetry and drift forecaster. Runs on background crons or post-merge triggers to audit historical performance drift, compiler diagnostics, and dependency shifts.",
+        "allowed_write_patterns": [
+          "docs/audits/oracle_*.md"
+        ],
+        "allowed_read_patterns": [
+          "**"
+        ]
+      },
+"The_Architect": {
         "_comment": "The Architect creates C++20 API contracts (.hpp) and refactoring specs. It never writes .cpp code or modifies CI. Must protect external caller ABI.",
         "allowed_write_patterns": [
           "src/engine/*.hpp",
