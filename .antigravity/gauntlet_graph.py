@@ -39,6 +39,8 @@ def execute_gauntlet(rfc_path: str):
 
     print("[Phase 1: Inquisitor] Interrogating RFC invariants (ABI, Memory, Concurrency)...")
     print("[1/6] Contract Generation: The Architect locks invariants.")
+    print("[Phase 3.5: Overgod Review] Contract available for Overgod inspection & mutation.")
+    print("[Phase 3.6: Inquisitor Counter-Audit] Auditing Overgod modifications for invariant drift...")
     print("[2/6] Pre-Flight Pinning: The Trapsmith writes baseline characterization tests.")
     
     print("[Phase 2: Inquisitor] Auditing The Trapsmith's test diff for silent skips & tautologies...")

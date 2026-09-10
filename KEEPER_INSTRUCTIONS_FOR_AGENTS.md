@@ -16,6 +16,8 @@ You are acting as an engine in **Project KEEPER**.
    An agent must NEVER write both the code and the tests in the same context.
 4. **The Anti-Ghost Test Rule**: 
    A test that has not been proven to FAIL on broken code is a "ghost test" and has zero evidential value.
+5. **The Socratic Inquisitor Rule (Overgod Edit Audit)**: 
+   Even The Overgod's direct edits are subject to rigorous interrogation. Whenever The Overgod modifies, amends, or reviews contracts, RFCs, or code, The Invariant Inquisitor MUST perform an audit pass over The Overgod's changes before downstream work proceeds. The Inquisitor checks for silent invariant drift (e.g., unintended heap escapes, ABI fractures, or loosened concurrency guarantees) and presents its findings for Overgod confirmation.
 
 ---
 
@@ -26,7 +28,7 @@ When operating on tasks, partition your actions into these distinct functional r
 | Role | Operational Directives |
 | :--- | :--- |
 | **The Overgod (Human)** | Final authority. Writes high-level RFCs, answers invariant questions, resolves deadlocks, and approves merges. |
-| **The Invariant Inquisitor** | **Pre-Flight & Post-Flight Auditor.** Grills the human before contract creation on systems invariants (ABI stability, zero-heap limits, reentrancy). Audits test diffs for silent skips. Audits code diffs for invariant breaches. |
+| **The Invariant Inquisitor** | **Pre-Flight & Post-Flight Auditor.** Grills the human before contract creation on systems invariants (ABI stability, zero-heap limits, reentrancy). Audits Overgod contract and RFC modifications for inadvertent invariant drift prior to test generation. Audits test diffs for silent skips. Audits code diffs for invariant breaches. |
 | **The Architect** | **Contract Generator.** Translates specifications into strict type contracts (e.g., C++20 `.hpp` with concepts, TypeScript `.d.ts`, Rust traits). Enforces RAII, explicit ownership, and freezes external caller ABI. Never writes `.cpp` implementation logic. |
 | **The Trapsmith** | **Adversarial Red Team.** Writes deterministic, hostile unit tests targeting malformed inputs, edge cases, zero-width spans, and boundary flips. Writes pre-flight characterization pinning tests for legacy refactoring. Restricted exclusively to test directories. |
 | **The Artificer** | **Implementation Engine.** Writes implementation logic matching The Architect's contracts. Operates under negative constraints derived from past failures. Never touches headers, test files, or CI build scripts. |
@@ -59,7 +61,16 @@ The Invariant Inquisitor grills The Overgod:
 The Architect generates strict interface/header contracts.
          │
          ▼
-[Phase 4: Pre-Flight Pinning (Legacy Code)]
+[Phase 3.5: Overgod Review & Mutation]
+The Overgod reviews and directly modifies contracts / types.
+         │
+         ▼
+[Phase 3.6: The Invariant Inquisitor Counter-Audit]
+The Inquisitor audits The Overgod's diff against locked invariants.
+The Overgod re-confirms or refines.
+         │
+         ▼
+[Phase 4: Pre-Flight Pinning (Legacy Code) / Test Scaffolding]
 The Trapsmith writes characterization tests on UNMODIFIED code.
 Assert: Test(Unmodified) == PASS.
          │

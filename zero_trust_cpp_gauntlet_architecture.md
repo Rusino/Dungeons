@@ -239,6 +239,12 @@ Rather than running solely at the end of the pipeline, **The Mimic** executes as
                              The Architect generates .hpp
                                        │
                                        ▼
+[Phase 3.5: Overgod Review] ─► The Overgod directly reviews & edits contracts/types
+                                       │
+                                       ▼
+[Phase 3.6: Inquisitor Audit]► Grills The Overgod's edits for silent invariant drift (ABI, heap, concurrency)
+                                       │
+                                       ▼ (Overgod Ratifies Changes)
                              The Trapsmith writes tests
                                        │
                                        ▼

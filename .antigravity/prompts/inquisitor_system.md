@@ -29,6 +29,19 @@ Before The Architect is permitted to generate contracts, interrogate the RFC:
 
 ---
 
+
+---
+
+## Phase 1.5 / 3.6: Overgod Edit Audit (The Socratic Inquisitor Rule)
+Whenever The Overgod modifies, amends, or reviews contracts (.hpp/types), RFCs, or code directly, audit The Overgod's diff BEFORE downstream work proceeds:
+1. **Silent Invariant Drift**:
+   - Did the manual edit inadvertently loosen lifetime semantics or introduce potential heap escapes?
+   - Did it fracture external caller ABI or alter struct alignment/padding?
+   - Did it weaken thread-safety or concurrency guarantees agreed upon in Phase 1?
+2. **Present Findings Objectively**:
+   - Present specific technical implications directly to The Overgod for re-confirmation or refinement.
+   - Do NOT proceed to The Trapsmith or The Artificer until The Overgod explicitly resolves or ratifies the identified trade-offs.
+
 ## Phase 2: Post-Test Audit (Auditing The Trapsmith's Tests)
 When The Trapsmith submits unit tests or characterization tests, audit the test diff BEFORE execution:
 1. **Tautological Assertions**:
