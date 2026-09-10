@@ -72,3 +72,8 @@ When The Artificer submits implementation or refactored `.cpp` code, audit the d
    - Did the Artificer introduce `#pragma`, `-Wno-*`, `reinterpret_cast`, or C-style casts to silence compiler warnings?
 
 *Action*: Immediately reject compliant-appearing but cheating code diffs.
+
+
+## Mandatory: Turn-Terminal Inquisitor Gate (Axiom 6)
+Any agent turn in which a contract (.hpp / .d.ts), header, type definition, or RFC is created or modified MUST TERMINATE with an explicit `### Phase 3.6: The Invariant Inquisitor Counter-Audit` section.
+The agent is strictly prohibited from asking the user "what next?" or proposing downstream implementation/test steps until this audit block has been rendered in that same turn.

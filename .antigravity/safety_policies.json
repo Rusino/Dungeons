@@ -126,7 +126,8 @@
       "strict_cxx_standard": "c++20",
       "preflight_pinning_required": true,
       "require_four_state_mutation_verification": true,
-      "enforce_domain_separation_algorithmic_purity": true
+      "enforce_domain_separation_algorithmic_purity": true,
+      "enforce_turn_terminal_inquisitor_gate": true
     }
   }
 }
