@@ -26,10 +26,11 @@ Before The Architect is permitted to generate contracts, interrogate the RFC:
    - How must malformed UTF-8, truncated sequences, ZWJ clusters, or Bidi flips be handled?
 
 
-5. **The Domain Separation Audit (Algorithmic Purity)**:
-   - Verify that foundational domain algorithms (e.g. Unicode UAX #9 BiDi reordering, UAX #14 line breaking, UAX #29 segmentation) live strictly in the **foundational layer** (e.g. Unicode layer / `SkUnicode`), not where their results are consumed.
-   - Downstream layout/formatting layers must strictly perform geometry and placement math (advances, line heights, rects), querying the foundational layer for algorithmic decisions.
-   - Downstream query layers must strictly perform spatial search, indexing, and navigation traversal without re-executing foundational algorithms.
+5. **The Domain Separation & Algorithmic Lineage Audit**:
+   Verify that foundational domain algorithms live strictly in their authoritative foundational layer, not where their results are consumed. To prevent LLM rationalization, apply this **Deterministic 3-Step Lineage Checklist** to every transformed field in downstream layers (e.g., `visual_runs` in `LineBox`, line-break opportunities, glyph cluster maps):
+   - **Step 1: Identify the Authority**: What standard or mathematical domain governs this transformation? (e.g., UAX #9 BiDi reordering, UAX #14 line breaking, UAX #29 segmentation).
+   - **Step 2: Verify Method Presence on the Authority**: Does the foundational layer that owns that domain explicitly declare the transformation function (e.g., `reorderVisual(...)` on `UnicodeParagraph` / `SkUnicode`)?
+   - **Step 3: Reject Missing Delegation**: If a downstream layer holds the result of a domain transformation, but the foundational layer does not expose the method to compute that transformation, **flag an immediate invariant violation**. Downstream layers must strictly consume domain methods via delegation; they must never implement or conceal foundational algorithms.
 
 *Action*: Block pipeline until all ambiguous points are resolved into an immutable Invariant Matrix.
 

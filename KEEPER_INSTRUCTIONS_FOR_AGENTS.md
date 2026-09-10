@@ -153,8 +153,8 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
    Always verify whether tests rely on external assets (like font directories, test vectors, or network mocks). If a test uses a macro or skip logic like `SKIP_IF_NOT_FOUND`, ensure the required flags or resources are actively supplied so assertions actually run.
 3. **No Warning Suppressions**:
    Never allow `#pragma`, `-Wno-*`, `reinterpret_cast`, or arbitrary `@ts-ignore` directives to resolve compiler or linter errors.
-4. **The Domain Separation Audit (Algorithmic Purity)**:
-   The Invariant Inquisitor must verify that algorithms live strictly in their foundational domain layer, not where their results are consumed. Downstream consumer layers must never implement or duplicate foundational domain algorithms:
-   - Foundational domain algorithms (e.g. Unicode UAX #9 BiDi reordering, UAX #14 line break classification, UAX #29 segmentation) must be pure functions or methods of the **foundational layer** (e.g. Unicode Layer).
-   - Downstream layout/formatting layers must strictly perform geometry and placement math (advances, line heights, rects), querying the foundational layer for algorithmic permutations.
-   - Downstream query layers must strictly perform spatial search, indexing, and navigation traversal without re-executing foundational algorithms.
+4. **The Domain Separation & Algorithmic Lineage Audit**:
+   The Invariant Inquisitor must verify that algorithms live strictly in their foundational domain layer, not where their results are consumed. To prevent LLM rationalization, apply this **Deterministic 3-Step Lineage Checklist** to every transformed field in downstream layers (e.g. `visual_runs` in `LineBox`, line-break opportunities, glyph cluster maps):
+   - **Step 1: Identify the Authority**: What standard or mathematical domain governs this transformation? (e.g., UAX #9 BiDi reordering, UAX #14 line breaking, UAX #29 segmentation).
+   - **Step 2: Verify Method Presence on the Authority**: Does the foundational layer that owns that domain explicitly declare the transformation function (e.g., `reorderVisual(...)` on `UnicodeParagraph`)?
+   - **Step 3: Reject Missing Delegation**: If a downstream layer holds the result of a domain transformation, but the foundational layer does not expose the method to compute that transformation, **flag an immediate invariant violation**. Downstream layers must strictly consume domain methods via delegation; they must never implement or conceal foundational algorithms.
