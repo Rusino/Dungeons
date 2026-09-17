@@ -178,11 +178,18 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
      ```
      If an algorithm fails to advance, the test must trigger an assertion failure in milliseconds rather than hanging the test runner process.
    - **Process-Level Invariant**: All test runner and binary invocations must be bounded with a hard execution timeout using Linux's `timeout <N>s` (e.g., `timeout 45s ./out/Debug/dm ...`). Any command exceeding its timeout is killed immediately by the OS with exit code 124.
-6. **The Bug-to-Trap Invariant (Defect Inquest Protocol)**:
-   - When The Overgod or QA reports a bug during acceptance testing, The Artificer is strictly prohibited from touching implementation files (`src/*.cpp`) until The Trapsmith has written a dedicated reproducer unit test.
-   - **Gate A Certification**: The reproducer test must be run on the unmodified code and MUST FAIL (`Assert: Test(Defect) == FAIL`). This guarantees the defect is accurately captured and prevents ghost fixes.
-   - **Artificer Resolution**: Only after Gate A is certified may The Artificer edit the implementation to resolve the failure (`Assert: Test(Fixed) == PASS`).
-   - **Gate B & Gauntlet**: Must pass mutation audit, ASan/UBSan sanitization, and the 45-second watchdog before returning to The Overgod for re-acceptance.
+6. **The Bug-to-Trap Invariant (Hardened Defect Inquest Protocol)**:
+   - When The Overgod or QA reports defects $D_1, D_2, \dots, D_n$ during acceptance testing, The Artificer is strictly prohibited from modifying implementation files until The Trapsmith passes all three mandatory gates:
+   - **Enforcement 1: The Bijective Defect Ledger (1-to-1 Mapping)**:
+     - The Trapsmith must construct a formal Defect Ledger mapping every reported bug $D_k$ to a named unit test $T_k$.
+     - No defect may be bundled, dismissed as "incidental", or excused as "trivial UI glue". An agent is strictly prohibited from claiming completion if any row in the ledger lacks independent Gate A and Gate B verification.
+   - **Enforcement 2: The Architectural Testability Law (The Anti-Glue Rule)**:
+     - If a defect appears in a layer that cannot currently be executed by the automated test runner (e.g. `main()`, standalone GUI binaries, native OS event callbacks), **patching it in place is an immediate protocol violation**.
+     - The engineer/agent **must** first refactor and decouple the logic into a headless, testable interface (e.g. moving event dispatching from window glue into the controller), and only then construct the reproducer test in the test runner.
+   - **Enforcement 3: Gate A & The "Time Machine" Reversion Proof**:
+     - Every reproducer test must be run on unmodified code and MUST FAIL (`Assert: Test(Defect) == FAIL`).
+     - Before declaring a fix complete, the agent must execute the **Reversion Proof**: temporarily reverting the fix MUST cause the test runner to fail. If a test remains green when the fix is removed, the trap is a phantom and Gate A is void.
+   - **Gate B & Gauntlet**: Only after all rows in the ledger pass Gate A, Artificer resolution, Reversion Proof, ASan/UBSan sanitization, and the 45-second watchdog may the changes be presented to The Overgod for re-acceptance.
 7. **The Full-Spectrum Headless Simulation & Dual-Contract Invariant**:
    - **The Dual-Contract Requirement (Logical + Spatial)**: When testing text mutation, navigation, or layout, tests must NEVER assert only the logical state (e.g. `text()` string equality, `text_index` integer values). Every mutation test MUST assert the corresponding spatial/geometric invariant:
      - After cursor movement or text deletion, `caret_rect` coordinates MUST reflect the exact boundary geometry (`fLeft > 0`, `fLeft != previous_fLeft`, `height > 0`).
