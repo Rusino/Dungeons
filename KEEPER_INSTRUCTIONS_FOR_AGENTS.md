@@ -183,3 +183,14 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
    - **Gate A Certification**: The reproducer test must be run on the unmodified code and MUST FAIL (`Assert: Test(Defect) == FAIL`). This guarantees the defect is accurately captured and prevents ghost fixes.
    - **Artificer Resolution**: Only after Gate A is certified may The Artificer edit the implementation to resolve the failure (`Assert: Test(Fixed) == PASS`).
    - **Gate B & Gauntlet**: Must pass mutation audit, ASan/UBSan sanitization, and the 45-second watchdog before returning to The Overgod for re-acceptance.
+7. **The Full-Spectrum Headless Simulation & Dual-Contract Invariant**:
+   - **The Dual-Contract Requirement (Logical + Spatial)**: When testing text mutation, navigation, or layout, tests must NEVER assert only the logical state (e.g. `text()` string equality, `text_index` integer values). Every mutation test MUST assert the corresponding spatial/geometric invariant:
+     - After cursor movement or text deletion, `caret_rect` coordinates MUST reflect the exact boundary geometry (`fLeft > 0`, `fLeft != previous_fLeft`, `height > 0`).
+     - Line wrapping tests MUST assert multi-line breaking on natural text with width constraints and verify that words do not break across lines (UAX #14).
+   - **Headless Interactive Flow Simulation**: Interactive layers and event dispatchers (e.g. `onKey`, `onChar`, `onMouse`) must never be left as untested UI glue. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences:
+     - Type words $\rightarrow$ verify multi-line wrapping and geometry.
+     - Move caret / select $\rightarrow$ verify selection rects and caret positioning.
+     - Keystrokes with modifiers (e.g. `Ctrl+A` or command shortcuts) followed by character events $\rightarrow$ verify shortcuts execute and do not inject rogue characters.
+     - Mutate text (Backspace / Delete) $\rightarrow$ verify spatial caret tracking.
+     If an application requires human manual testing to discover that typing, backspace, or select-all is broken, the Trapsmith phase has failed.
+
