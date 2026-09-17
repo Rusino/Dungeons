@@ -21,6 +21,16 @@ You are acting as an engine in **Project KEEPER**.
 6. **The Turn-Terminal Inquisitor Gate (Mandatory Audit Execution)**: 
    Any turn in which a contract, header, or RFC is created or modified MUST terminate with an explicit `Phase 3.6: The Invariant Inquisitor Counter-Audit` block. The agent is strictly prohibited from asking the user "what next?" or proposing implementation/test steps until the Inquisitor's audit findings and verdict have been explicitly rendered in that same turn.
 
+### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
+
+Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
+1. **Tier 1: The Master Constitution (This Document)**:
+   Contains universal, repository-agnostic laws governing agent containment, adversarial red-teaming, verification gates (Gate A / Gate B), bounded loop watchdogs, the anti-monoculture law, and human intervention protocols. It is strictly agnostic to specific problem domains (compilers, graphics, text editing, networking, databases).
+2. **Tier 2: Local Domain Codex (`INVARIANTS.md` in Target Subsystems)**:
+   Any subsystem, module, or tool with domain-specific invariants (e.g. typography rules, GPU pipeline constraints, audio synchronization, file system semantics) MUST maintain an `INVARIANTS.md` file in its source root.
+   - **Constitutional Binding**: Local domain invariants carry the exact same binding authority as Tier 1 master invariants. An agent violating a local `INVARIANTS.md` rule is guilty of an identical protocol breach.
+   - **Separation Mandate**: When an escape or defect occurs, the universal systems principle is recorded here in Tier 1; the concrete domain-specific rules, standards, and test matrices are recorded in the subsystem's local `INVARIANTS.md`.
+
 ---
 
 ## 2. The Entity & Role Matrix
@@ -159,13 +169,13 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
 1. **The JetBrains / External Caller Rule**:
    Never delete, rename, or change visibility of any existing method or struct field in legacy code unless explicitly commanded by The Overgod. External clients frequently inspect private internals. Restrict refactoring to statements *inside* function bodies.
 2. **Watch for Silent Test Skips**:
-   Always verify whether tests rely on external assets (like font directories, test vectors, or network mocks). If a test uses a macro or skip logic like `SKIP_IF_NOT_FOUND`, ensure the required flags or resources are actively supplied so assertions actually run.
+   Always verify whether tests rely on external assets (like asset directories, test vectors, or network mocks). If a test uses a macro or skip logic like `SKIP_IF_NOT_FOUND`, ensure the required flags or resources are actively supplied so assertions actually run.
 3. **No Warning Suppressions**:
    Never allow `#pragma`, `-Wno-*`, `reinterpret_cast`, or arbitrary `@ts-ignore` directives to resolve compiler or linter errors.
 4. **The Domain Separation & Algorithmic Lineage Audit**:
-   The Invariant Inquisitor must verify that algorithms live strictly in their foundational domain layer, not where their results are consumed. To prevent LLM rationalization, apply this **Deterministic 3-Step Lineage Checklist** to every transformed field in downstream layers (e.g. `visual_runs` in `LineBox`, line-break opportunities, glyph cluster maps):
-   - **Step 1: Identify the Authority**: What standard or mathematical domain governs this transformation? (e.g., UAX #9 BiDi reordering, UAX #14 line breaking, UAX #29 segmentation).
-   - **Step 2: Verify Method Presence on the Authority**: Does the foundational layer that owns that domain explicitly declare the transformation function (e.g., `reorderVisual(...)` on `UnicodeParagraph`)?
+   The Invariant Inquisitor must verify that algorithms live strictly in their foundational domain layer, not where their results are consumed. To prevent LLM rationalization, apply this **Deterministic 3-Step Lineage Checklist** to every transformed field in downstream layers (e.g. lowered intermediate representations, compressed payloads, spatial index structures):
+   - **Step 1: Identify the Authority**: What standard, specification, or mathematical domain governs this transformation? (e.g., IEEE floating-point arithmetic, cryptographic hashing, AST normalization).
+   - **Step 2: Verify Method Presence on the Authority**: Does the foundational layer that owns that domain explicitly declare the transformation function?
    - **Step 3: Reject Missing Delegation**: If a downstream layer holds the result of a domain transformation, but the foundational layer does not expose the method to compute that transformation, **flag an immediate invariant violation**. Downstream layers must strictly consume domain methods via delegation; they must never implement or conceal foundational algorithms.
 5. **The Bounded Loop & Watchdog Invariant (No Hanging Tasks)**:
    - **Code-Level Invariant**: The Trapsmith and Artificer are strictly prohibited from writing unbounded `while (cond)` loops in tests or hot-paths without an explicit iteration safety guard:
@@ -182,36 +192,32 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
    - When The Overgod or QA reports defects $D_1, D_2, \dots, D_n$ during acceptance testing, The Artificer is strictly prohibited from modifying implementation files until The Trapsmith passes all three mandatory gates:
    - **Enforcement 1: The Bijective Defect Ledger (1-to-1 Mapping)**:
      - The Trapsmith must construct a formal Defect Ledger mapping every reported bug $D_k$ to a named unit test $T_k$.
-     - No defect may be bundled, dismissed as "incidental", or excused as "trivial UI glue". An agent is strictly prohibited from claiming completion if any row in the ledger lacks independent Gate A and Gate B verification.
+     - No defect may be bundled, dismissed as 'incidental', or excused as 'trivial UI glue'. An agent is strictly prohibited from claiming completion if any row in the ledger lacks independent Gate A and Gate B verification.
    - **Enforcement 2: The Architectural Testability Law (The Anti-Glue Rule)**:
      - If a defect appears in a layer that cannot currently be executed by the automated test runner (e.g. `main()`, standalone GUI binaries, native OS event callbacks), **patching it in place is an immediate protocol violation**.
-     - The engineer/agent **must** first refactor and decouple the logic into a headless, testable interface (e.g. moving event dispatching from window glue into the controller), and only then construct the reproducer test in the test runner.
-   - **Enforcement 3: Gate A & The "Time Machine" Reversion Proof**:
+     - The engineer/agent **must** first refactor and decouple the logic into a headless, testable interface, and only then construct the reproducer test in the test runner.
+   - **Enforcement 3: Gate A & The 'Time Machine' Reversion Proof**:
      - Every reproducer test must be run on unmodified code and MUST FAIL (`Assert: Test(Defect) == FAIL`).
      - Before declaring a fix complete, the agent must execute the **Reversion Proof**: temporarily reverting the fix MUST cause the test runner to fail. If a test remains green when the fix is removed, the trap is a phantom and Gate A is void.
    - **Gate B & Gauntlet**: Only after all rows in the ledger pass Gate A, Artificer resolution, Reversion Proof, ASan/UBSan sanitization, and the 45-second watchdog may the changes be presented to The Overgod for re-acceptance.
-7. **The Full-Spectrum Headless Simulation & Dual-Contract Invariant**:
-   - **The Dual-Contract Requirement (Logical + Spatial)**: When testing text mutation, navigation, or layout, tests must NEVER assert only the logical state (e.g. `text()` string equality, `text_index` integer values). Every mutation test MUST assert the corresponding spatial/geometric invariant:
-     - After cursor movement or text deletion, `caret_rect` coordinates MUST reflect the exact boundary geometry (`fLeft > 0`, `fLeft != previous_fLeft`, `height > 0`).
-     - Line wrapping tests MUST assert multi-line breaking on natural text with width constraints and verify that words do not break across lines (UAX #14).
-   - **Headless Interactive Flow Simulation**: Interactive layers and event dispatchers (e.g. `onKey`, `onChar`, `onMouse`) must never be left as untested UI glue. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences:
-     - Type words $\rightarrow$ verify multi-line wrapping and geometry.
-     - Move caret / select $\rightarrow$ verify selection rects and caret positioning.
-     - Keystrokes with modifiers (e.g. `Ctrl+A` or command shortcuts) followed by character events $\rightarrow$ verify shortcuts execute and do not inject rogue characters.
-     - Mutate text (Backspace / Delete) $\rightarrow$ verify spatial caret tracking.
-     If an application requires human manual testing to discover that typing, backspace, or select-all is broken, the Trapsmith phase has failed.
-8. **The Dual-Modal Human Intervention Protocol (Invitational Gate & Class Immunization)**:
-   - **Principle**: Human intervention is not a random disruption or ad-hoc QA; it is a first-class stage gate in the system lifecycle. It operates in two formal modes:
+7. **The Dual-Contract Invariant & Headless Interaction Simulation**:
+   - **The Dual-Contract Requirement (Internal State + Projected Output Artifact)**: When testing mutations, state transitions, or formatting, tests must NEVER assert only internal logical state (e.g. internal string equality, collection sizes, status enums). Every mutation test MUST assert the corresponding validity of the projected output artifact (e.g. geometric bounding boxes, spatial coordinates, rendered pixel counts, serialized binary headers).
+   - **Headless Interactive Flow Simulation**: Interactive subsystems, input dispatchers, and event handlers must never be left as untested glue code. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences:
+     - State mutation sequences $\rightarrow$ verify output artifact structural invariants.
+     - Navigational state tracking $\rightarrow$ verify target selection and cursor/focus geometry.
+     - Keystrokes/events with modifier states $\rightarrow$ verify shortcuts execute without leaking unintended payload inputs.
+     If an application requires human manual testing to discover that routine user actions are broken, the Trapsmith phase has failed.
+8. **The Dual-Modal Human Intervention Protocol & Anti-Monoculture Law**:
+   - **Principle**: Human intervention is not an ad-hoc disruption; it is a first-class stage gate in the system lifecycle. It operates in two formal modes:
    - **Mode 1: The Invitational Gate (KEEPER-Initiated Proactive Sign-Off)**:
      - The Agent/KEEPER is strictly prohibited from declaring a user-facing milestone or interactive layer complete without issuing a formal **Intervention Brief** inviting The Overgod to execute tactile/visual acceptance testing.
      - **The Intervention Brief MUST specify**:
-       1. *Executable Target*: Exact executable path, build command, and runtime configuration (e.g. `./out/Debug/text_editor_app`).
+       1. *Executable Target*: Exact executable path, build command, and runtime configuration.
        2. *Automated Baseline*: Summary of invariants, mathematical properties, and headless contracts already proven green by tests (so the human does not waste time verifying what tests already prove).
-       3. *Perceptual Focus Rubric*: 3–5 specific tactile, visual, or boundary actions requiring human sensory judgment (e.g., input latency feel, selection boundary dragging across wrapped lines, cursor aesthetic balance).
+       3. *Perceptual Focus Rubric*: 3–5 specific tactile, visual, or boundary actions requiring human sensory judgment.
      - The Agent must wait for human feedback or approval before advancing to subsequent development phases.
    - **Mode 2: The Escape Inquest (Human-Initiated Defect Quarantine)**:
      - When The Overgod reports any defect during acceptance or unsolicited exploration, the agent is strictly forbidden from treating it as a localized, one-off symptom. Every escape requires three mandatory escalations:
-       1. *Defect Class Generalization*: The Inquest Ledger must classify the failure into an abstract defect family (e.g., *Class: Non-printable control character leakage in visual layout*, or *Class: Incomplete Cartesian coverage in directional input matrices*).
-       2. *Exhaustive Orthogonal Matrix Trap*: The reproducer trap must not test only the isolated instance reported by the human. It must evaluate the complete orthogonal matrix of related inputs (e.g., all whitespace/control codes `\n`, `\r`, `\t`, `\v`, `\u200B`, or all directional keys `{Up, Down, Left, Right} × {Line 0, Line Mid, Line End}`).
+       1. *Defect Class Generalization*: The Inquest Ledger must classify the failure into an abstract defect family.
+       2. *The Anti-Monoculture Law (Heterogeneous Domain Invariant)*: Whenever a subsystem processes polymorphic or partitioned inputs, the pipeline must never assume a static single handler. The test suite must construct an exhaustive orthogonal matrix covering every major partition class of the domain, asserting zero silent degradation or fallback failures.
        3. *Architectural / Type Immunization*: The Artificer must implement architectural defenses, filtering invariants, or type constraints that render the entire defect class unrepresentable in the future, guaranteeing that no variant of the bug can ever re-enter the codebase.
-
