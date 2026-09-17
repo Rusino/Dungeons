@@ -200,4 +200,18 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
      - Keystrokes with modifiers (e.g. `Ctrl+A` or command shortcuts) followed by character events $\rightarrow$ verify shortcuts execute and do not inject rogue characters.
      - Mutate text (Backspace / Delete) $\rightarrow$ verify spatial caret tracking.
      If an application requires human manual testing to discover that typing, backspace, or select-all is broken, the Trapsmith phase has failed.
+8. **The Dual-Modal Human Intervention Protocol (Invitational Gate & Class Immunization)**:
+   - **Principle**: Human intervention is not a random disruption or ad-hoc QA; it is a first-class stage gate in the system lifecycle. It operates in two formal modes:
+   - **Mode 1: The Invitational Gate (KEEPER-Initiated Proactive Sign-Off)**:
+     - The Agent/KEEPER is strictly prohibited from declaring a user-facing milestone or interactive layer complete without issuing a formal **Intervention Brief** inviting The Overgod to execute tactile/visual acceptance testing.
+     - **The Intervention Brief MUST specify**:
+       1. *Executable Target*: Exact executable path, build command, and runtime configuration (e.g. `./out/Debug/text_editor_app`).
+       2. *Automated Baseline*: Summary of invariants, mathematical properties, and headless contracts already proven green by tests (so the human does not waste time verifying what tests already prove).
+       3. *Perceptual Focus Rubric*: 3–5 specific tactile, visual, or boundary actions requiring human sensory judgment (e.g., input latency feel, selection boundary dragging across wrapped lines, cursor aesthetic balance).
+     - The Agent must wait for human feedback or approval before advancing to subsequent development phases.
+   - **Mode 2: The Escape Inquest (Human-Initiated Defect Quarantine)**:
+     - When The Overgod reports any defect during acceptance or unsolicited exploration, the agent is strictly forbidden from treating it as a localized, one-off symptom. Every escape requires three mandatory escalations:
+       1. *Defect Class Generalization*: The Inquest Ledger must classify the failure into an abstract defect family (e.g., *Class: Non-printable control character leakage in visual layout*, or *Class: Incomplete Cartesian coverage in directional input matrices*).
+       2. *Exhaustive Orthogonal Matrix Trap*: The reproducer trap must not test only the isolated instance reported by the human. It must evaluate the complete orthogonal matrix of related inputs (e.g., all whitespace/control codes `\n`, `\r`, `\t`, `\v`, `\u200B`, or all directional keys `{Up, Down, Left, Right} × {Line 0, Line Mid, Line End}`).
+       3. *Architectural / Type Immunization*: The Artificer must implement architectural defenses, filtering invariants, or type constraints that render the entire defect class unrepresentable in the future, guaranteeing that no variant of the bug can ever re-enter the codebase.
 
