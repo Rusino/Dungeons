@@ -202,6 +202,8 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
    - **Gate B & Gauntlet**: Only after all rows in the ledger pass Gate A, Artificer resolution, Reversion Proof, ASan/UBSan sanitization, and the 45-second watchdog may the changes be presented to The Overgod for re-acceptance.
 7. **The Dual-Contract Invariant & Headless Interaction Simulation**:
    - **The Dual-Contract Requirement (Internal State + Projected Output Artifact)**: When testing mutations, state transitions, or formatting, tests must NEVER assert only internal logical state (e.g. internal string equality, collection sizes, status enums). Every mutation test MUST assert the corresponding validity of the projected output artifact (e.g. geometric bounding boxes, spatial coordinates, rendered pixel counts, serialized binary headers).
+   - **The Cross-Layer Stress Propagation Invariant (No Single-Dimension Traps)**: Whenever an edge-case, boundary condition, or stress input class (e.g. multi-codepoint grapheme clusters, combining marks, BiDi RTL runs, surrogate pairs, zero-width joiners, empty buffers) is identified in any foundational layer, the Trapsmith is strictly required to propagate that identical input across all higher operational dimensions: Layout/Formatting $\rightarrow$ Spatial Navigation $\rightarrow$ Mutation/Editing $\rightarrow$ Visual Rendering. A stress input tested in only one layer is a protocol violation.
+   - **The Zero-Delta Phantom Navigation Law**: In any spatial navigation or interactive focus system, an input action (e.g. arrow keystroke, incremental seek) that alters internal logical state (`index++`) while producing zero spatial displacement ($\Delta X = 0, \Delta Y = 0$) without reaching a legitimate document boundary is classified as a Phantom Step defect and an automatic test failure.
    - **Headless Interactive Flow Simulation**: Interactive subsystems, input dispatchers, and event handlers must never be left as untested glue code. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences:
      - State mutation sequences $\rightarrow$ verify output artifact structural invariants.
      - Navigational state tracking $\rightarrow$ verify target selection and cursor/focus geometry.
@@ -217,7 +219,21 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
        3. *Perceptual Focus Rubric*: 3–5 specific tactile, visual, or boundary actions requiring human sensory judgment.
      - The Agent must wait for human feedback or approval before advancing to subsequent development phases.
    - **Mode 2: The Escape Inquest (Human-Initiated Defect Quarantine)**:
-     - When The Overgod reports any defect during acceptance or unsolicited exploration, the agent is strictly forbidden from treating it as a localized, one-off symptom. Every escape requires three mandatory escalations:
-       1. *Defect Class Generalization*: The Inquest Ledger must classify the failure into an abstract defect family.
-       2. *The Anti-Monoculture Law (Heterogeneous Domain Invariant)*: Whenever a subsystem processes polymorphic or partitioned inputs, the pipeline must never assume a static single handler. The test suite must construct an exhaustive orthogonal matrix covering every major partition class of the domain, asserting zero silent degradation or fallback failures.
-       3. *Architectural / Type Immunization*: The Artificer must implement architectural defenses, filtering invariants, or type constraints that render the entire defect class unrepresentable in the future, guaranteeing that no variant of the bug can ever re-enter the codebase.
+     - When The Overgod reports any defect during acceptance or unsolicited exploration, the agent is strictly forbidden from treating it as a localized, one-off symptom. Every escape requires four mandatory mechanical enforcements:
+       1. **The Mandatory Inquest Header**: The agent's very first response following a reported escape MUST output the structured Inquest Header before executing any code modifications:
+          ```markdown
+          ### 🚨 KEEPER ESCAPE INQUEST INITIATED [Defect D_k]
+          1. Defect Classification: [Family Name, e.g. Zero-Advance Spatial Stalling]
+          2. Layer Origin: [Foundational Layer where the defect originates]
+          3. Reversion Trap Name: [Named test in test suite]
+          4. Anti-Monoculture Matrix Partitions: [Exhaustive domain partitions tested]
+          5. Pending Domain Invariant: [Domain Invariant X to be added to INVARIANTS.md]
+          6. Mode 1 Verification Plan: [Executable Target + Tactile Rubric]
+          ```
+       2. **The Anti-Monoculture Law (Heterogeneous Domain Invariant)**: Whenever a subsystem processes polymorphic or partitioned inputs, the pipeline must never assume a static single handler. The test suite must construct an exhaustive orthogonal matrix covering every major partition class of the domain, asserting zero silent degradation or fallback failures.
+       3. **Architectural / Type Immunization**: The Artificer must implement architectural defenses, filtering invariants, or type constraints that render the entire defect class unrepresentable in the future, guaranteeing that no variant of the bug can ever re-enter the codebase.
+       4. **The Atomic Git Triplet Law**: Any git commit resolving a human-reported escape ($D_k$) is **physically rejected** unless `git diff --cached --stat` atomically includes all three components:
+          - Implementation fix (`src/...`)
+          - Defect Trap & Anti-Monoculture Matrix (`tests/...`)
+          - Tier 2 Domain Codex rule (`INVARIANTS.md`)
+          Committing a fix to `src/` without updating `INVARIANTS.md` is an immediate constitutional violation.
