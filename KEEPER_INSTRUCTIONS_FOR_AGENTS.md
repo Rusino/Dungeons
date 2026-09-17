@@ -104,8 +104,15 @@ Assert: Test(Mutated_Refactored) == FAIL.
 [Fail]       [Pass]
   │             │
   ▼             ▼
-[Record in    [The Overgod Final Approval]
+[Record in    [Phase 9: The Overgod Final Approval]
 Graveyard]    Human reviews diff for elegance and merges.
+                    │
+            [Defects Found]
+                    ▼
+            [The Bug-to-Trap Inquest]
+            1. The Trapsmith writes reproducer test.
+            2. Gate A: Assert Test(Defect) == FAIL.
+            3. Return to Phase 6 (The Artificer Fix).
 ```
 
 ---
@@ -171,3 +178,8 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
      ```
      If an algorithm fails to advance, the test must trigger an assertion failure in milliseconds rather than hanging the test runner process.
    - **Process-Level Invariant**: All test runner and binary invocations must be bounded with a hard execution timeout using Linux's `timeout <N>s` (e.g., `timeout 45s ./out/Debug/dm ...`). Any command exceeding its timeout is killed immediately by the OS with exit code 124.
+6. **The Bug-to-Trap Invariant (Defect Inquest Protocol)**:
+   - When The Overgod or QA reports a bug during acceptance testing, The Artificer is strictly prohibited from touching implementation files (`src/*.cpp`) until The Trapsmith has written a dedicated reproducer unit test.
+   - **Gate A Certification**: The reproducer test must be run on the unmodified code and MUST FAIL (`Assert: Test(Defect) == FAIL`). This guarantees the defect is accurately captured and prevents ghost fixes.
+   - **Artificer Resolution**: Only after Gate A is certified may The Artificer edit the implementation to resolve the failure (`Assert: Test(Fixed) == PASS`).
+   - **Gate B & Gauntlet**: Must pass mutation audit, ASan/UBSan sanitization, and the 45-second watchdog before returning to The Overgod for re-acceptance.
