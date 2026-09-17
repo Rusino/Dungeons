@@ -160,3 +160,14 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
    - **Step 1: Identify the Authority**: What standard or mathematical domain governs this transformation? (e.g., UAX #9 BiDi reordering, UAX #14 line breaking, UAX #29 segmentation).
    - **Step 2: Verify Method Presence on the Authority**: Does the foundational layer that owns that domain explicitly declare the transformation function (e.g., `reorderVisual(...)` on `UnicodeParagraph`)?
    - **Step 3: Reject Missing Delegation**: If a downstream layer holds the result of a domain transformation, but the foundational layer does not expose the method to compute that transformation, **flag an immediate invariant violation**. Downstream layers must strictly consume domain methods via delegation; they must never implement or conceal foundational algorithms.
+5. **The Bounded Loop & Watchdog Invariant (No Hanging Tasks)**:
+   - **Code-Level Invariant**: The Trapsmith and Artificer are strictly prohibited from writing unbounded `while (cond)` loops in tests or hot-paths without an explicit iteration safety guard:
+     ```cpp
+     int stepLimit = 0;
+     while (cond && ++stepLimit < MAX_STEPS) {
+         // work
+     }
+     REPORTER_ASSERT(reporter, stepLimit < MAX_STEPS);
+     ```
+     If an algorithm fails to advance, the test must trigger an assertion failure in milliseconds rather than hanging the test runner process.
+   - **Process-Level Invariant**: All test runner and binary invocations must be bounded with a hard execution timeout using Linux's `timeout <N>s` (e.g., `timeout 45s ./out/Debug/dm ...`). Any command exceeding its timeout is killed immediately by the OS with exit code 124.
