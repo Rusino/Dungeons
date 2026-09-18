@@ -251,8 +251,14 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
           6. Mode 1 Verification Plan: [Executable Target + Tactile Rubric]
           ```
        2. **The Anti-Monoculture Law (Heterogeneous Domain Invariant)**: Whenever a subsystem processes polymorphic or partitioned inputs, the pipeline must never assume a static single handler. The test suite must construct an exhaustive orthogonal matrix covering every major partition class of the domain, asserting zero silent degradation or fallback failures.
-       3. **Architectural / Type Immunization**: The Artificer must implement architectural defenses, filtering invariants, or type constraints that render the entire defect class unrepresentable in the future, guaranteeing that no variant of the bug can ever re-enter the codebase.
-       4. **The Atomic Git Triplet Law**: Any git commit resolving a human-reported escape ($D_k$) is **physically rejected** unless `git diff --cached --stat` atomically includes all three components:
+       3. **The Projection Purity Law (Single Source of Render Truth)**: In any layered system with a visual or presentation consumer (e.g. Painter, Renderer, View), the consumer is strictly prohibited from recalculating geometry, maintaining separate coordinate branching, or querying lower foundational models directly. The presentation layer must be a passive 1-to-1 consumer of the ViewModel projection. Every defect trap asserting interactive mutations MUST execute through the consumer harness (e.g. headless canvas / mock visualizer) to prevent divergent projection bugs.
+       4. **The Mandatory 4-Stage Defect Inquest Protocol**:
+          Whenever The Overgod reports any escape, the agent is strictly prohibited from modifying code immediately. It MUST execute this mechanical progression:
+          - **Stage 1 (Inquest & Rule Proposal)**: In the immediate response turn (with zero mutating tools), output the Inquest Header, analyze the root cause, identify the specification/test gap, draft the proposed Invariant, and formulate a Time-Machine proof. STOP and await Overgod confirmation.
+          - **Stage 2 (Codification & Gate A Trap)**: Codify the invariant into `INVARIANTS.md`, construct the hostile test trap asserting the visual/consumer output, and prove failure on unmodified code (`Test(Defect) == FAIL`).
+          - **Stage 3 (Artificer Resolution & Gate B Gauntlet)**: Apply the structural fix, prove all tests pass under ASan/UBSan, and run the reversion proof.
+          - **Stage 4 (Interactive Hand-off)**: Issue the Axiom 10 Intervention Brief with run command and verification script.
+       5. **The Atomic Git Triplet Law**: Any git commit resolving a human-reported escape ($D_k$) is **physically rejected** unless `git diff --cached --stat` atomically includes all three components:
           - Implementation fix (`src/...`)
           - Defect Trap & Anti-Monoculture Matrix (`tests/...`)
           - Tier 2 Domain Codex rule (`INVARIANTS.md`)
