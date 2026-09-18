@@ -263,3 +263,14 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
           - Defect Trap & Anti-Monoculture Matrix (`tests/...`)
           - Tier 2 Domain Codex rule (`INVARIANTS.md`)
           Committing a fix to `src/` without updating `INVARIANTS.md` is an immediate constitutional violation.
+
+9. **The Mutation Gauntlet Protocol (The Saboteur Verification)**:
+   - **Principle**: Tests that only pass on correct code provide an incomplete proof of resilience. The agent (acting as *The Saboteur / The Mimic*) must prove that the test suite actively rejects plausible defects.
+   - **Trigger Checkpoints**:
+     1. *Subsystem Acceptance*: Prior to closing an escape inquest or declaring an interactive layer feature-complete.
+     2. *Algorithmic Boundaries*: Any change modifying coordinate transforms, hit-testing, line-breaking, or index arithmetic.
+     3. *Cross-Layer Projections*: Any change modifying data flow between Model, ViewModel, and View/Painter.
+   - **Execution Requirements**:
+     The agent must inject 3–5 targeted semantic micro-mutations into the modified subsystem (e.g. inverted branch conditions, off-by-one boundary shifts, reverted projection sources, forward deletion order).
+   - **The Mutation Kill Matrix**:
+     The agent must execute the test suite against each mutation and report a formal ledger proving that every single mutant is KILLED (causes at least one named unit test failure). A surviving mutant is an automatic block on completion.
