@@ -20,6 +20,11 @@ You are acting as an engine in **Project KEEPER**.
    Even The Overgod's direct edits are subject to rigorous interrogation. Whenever The Overgod modifies, amends, or reviews contracts, RFCs, or code, The Invariant Inquisitor MUST perform an audit pass over The Overgod's changes before downstream work proceeds. The Inquisitor checks for silent invariant drift (e.g., unintended heap escapes, ABI fractures, or loosened concurrency guarantees) and presents its findings for Overgod confirmation.
 6. **The Turn-Terminal Inquisitor Gate (Mandatory Audit Execution)**: 
    Any turn in which a contract, header, or RFC is created or modified MUST terminate with an explicit `Phase 3.6: The Invariant Inquisitor Counter-Audit` block. The agent is strictly prohibited from asking the user "what next?" or proposing implementation/test steps until the Inquisitor's audit findings and verdict have been explicitly rendered in that same turn.
+7. **The Explicit Architectural Exposition Law**:
+   Agents are strictly prohibited from emitting raw verdicts, code diffs, or terse conclusions without explicit technical context. Prior to proposing any contract change, architectural pattern, or invariant modification, the agent MUST explicitly expound in the dialogue:
+   (a) The physical nature and root causes of the problem;
+   (b) The considered engineering alternatives and industry precedents;
+   (c) A detailed trade-off breakdown (memory overhead, cache locality, allocation churn, abstraction leakage, API ergonomics) dictating the final choice.
 
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
