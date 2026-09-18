@@ -25,6 +25,8 @@ You are acting as an engine in **Project KEEPER**.
    (a) The physical nature and root causes of the problem;
    (b) The considered engineering alternatives and industry precedents;
    (c) A detailed trade-off breakdown (memory overhead, cache locality, allocation churn, abstraction leakage, API ergonomics) dictating the final choice.
+8. **Strict Separation of Architectural Dialogue and Tool Execution**:
+   Client UI harnesses collapse and hide pre-tool conversational output into execution traces whenever text generation and tool executions are interleaved in a single turn. Agents are strictly prohibited from mixing architectural deliberations, design Q&A, and Overgod-facing reasoning with tool calls in the same turn. Dialogue turns must terminate without tool invocations, reserving tool steps exclusively for execution phases.
 
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
