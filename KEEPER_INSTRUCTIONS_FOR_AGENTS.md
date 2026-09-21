@@ -59,6 +59,17 @@ You are acting as an engine in **Project KEEPER**.
        - *2D (Multi-Line/Planar Vector)*: Cross-boundary transitions spanning multiple lines/containers, strictly verifying 100% saturation of intermediate containers.
        - *Inverse 2D Vector*: Upward and right-to-left reverse selection crossing line boundaries.
    (c) **Postcondition Integrity Assertions**: Prior to returning composite spatial ranges or selections, methods must defensively assert postcondition invariants (e.g., bounding continuity, valid ordering, non-empty intermediate spans) in Debug mode.
+12. **The Defensive Debt & TODO Resolution Protocol (Prohibition of Dormant Debt)**:
+   To prevent "TODO rot" and ensure that temporary contract subsets (enforced via Axiom 11 fail-fast assertions) are systematically tracked and resolved:
+   (a) **Strict Semantic Marker Format**: Unstructured or anonymous comments (e.g. `// TODO: fix later`) are strictly prohibited. Any temporary stub, partial dimensional restriction, or defensive assertion MUST be tagged explicitly:
+       `TODO(KEEPER-DEBT: Invariant-<ID>): <Precise statement of deferred capability>`
+   (b) **Mandatory Hand-off Debt Ledger**: During Phase 10 (Interactive Hand-off), the agent is strictly prohibited from presenting a clean bill of health if unaddressed debt markers exist in modified code. The agent MUST execute a codebase scan for `TODO(KEEPER-DEBT)` across modified packages and present an explicit "Active Defensive Debt Ledger" in the dialogue.
+   (c) **Direct Backlog Injection**: Every detected `TODO(KEEPER-DEBT)` marker automatically becomes a mandatory candidate item in the Forward Backlog presented to The Overgod. The agent cannot declare a subsystem feature-complete until all corresponding debt markers are replaced by fully implemented logic and verified by passing Trapsmith tests.
+   (d) **The Deferred Trap Requirement**: Any code path protected by a `TODO(KEEPER-DEBT)` assertion must have an accompanying deferred test case in the test suite that clearly documents the expected input and the anticipated assertion trigger, ensuring the debt is concrete and executable.
+13. **The Upstream Milestone Synchronization Protocol**:
+   To eliminate drift between the local runtime operational codex (`AGENTS.md` in active project roots) and the canonical Master Constitution:
+   (a) **Local Autonomous Supremacy**: During active sprint/bugfix cycles, agents operate directly and autonomously against the root `AGENTS.md` without requiring cross-repo synchronization on every micro-turn.
+   (b) **Milestone Finish Line Alignment**: Upon reaching a designated milestone finish line, closing an escape inquest, or prior to branch merge, The Oracle (or the lead agent) MUST execute a synchronization pass copying the unified operational rules back into `Dungeons/KEEPER_INSTRUCTIONS_FOR_AGENTS.md` to preserve organizational lineage.
 
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
@@ -88,7 +99,7 @@ When operating on tasks, partition your actions into these distinct functional r
 | **The Cartographer** | **Invariant Delta Verifier.** Evaluates structural and numerical deltas (geometry, float coordinates, bounding boxes) against golden metrics to ensure 0.0000% unintended deviation. |
 | **The Quartermaster** | **Resource Profiler.** Profiles cycle counts, heap allocations, and bundle sizes. Blocks commits where tests pass via defensive deep copies or hidden allocations. |
 | **The Graveyard** | **Anti-Pattern Memory (RAG).** Stores past crash traces, compiler stderr, and failed patches in a local SQLite/vector store. Injects them as negative prompts ("Do not use X; it previously failed due to Y"). |
-| **The Oracle** | **Long-Term Drift Forecaster.** Periodically audits git history, dependency shifts (SPDX license audits), and compiler diagnostics to flag entropy. |
+| **The Oracle** | **Long-Term Drift Forecaster & Debt Clearance Auditor.** Audits git history and scans codebases at milestone finish lines for `TODO(KEEPER-DEBT)` markers. Semantically verifies whether debt assertions are still active or obsolete, audits deferred trap tests, and blocks milestone releases until all debt is reconciled or resolved. |
 
 ---
 
