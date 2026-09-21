@@ -71,6 +71,16 @@ You are acting as an engine in **Project KEEPER**.
    To eliminate drift between the local runtime operational codex (`AGENTS.md` in active project roots) and the canonical Master Constitution:
    (a) **Local Autonomous Supremacy**: During active sprint/bugfix cycles, agents operate directly and autonomously against the root `AGENTS.md` without requiring cross-repo synchronization on every micro-turn.
    (b) **Milestone Finish Line Alignment**: Upon reaching a designated milestone finish line, closing an escape inquest, or prior to branch merge, The Oracle (or the lead agent) MUST execute a synchronization pass copying the unified operational rules back into `Dungeons/KEEPER_INSTRUCTIONS_FOR_AGENTS.md` to preserve organizational lineage.
+14. **The Cohesive State Invariant (Prohibition of Anemic Dependent Structs)**:
+   To prevent split-brain state mutations and silent invariant erosion across multi-field composite structures:
+   (a) **Strict Encapsulation of Mutual Invariants**: Any data structure where fields maintain mutual, dependent invariants (such as `anchor`, `focus`, and multi-line visual `ranges` defining selection state) MUST NOT expose raw mutable fields for disjointed external mutation. State transitions MUST be guarded behind atomic mutator methods (e.g. `collapse_to(pos)`, `set_span(a, f)`, `set_ranges(a, f, ranges)`).
+   (b) **Prohibition of Partial Mutation**: Callers are strictly prohibited from mutating an individual field of a composite invariant struct directly. If an operation affects one aspect of the invariant (e.g., collapsing a focus point), the mutator must atomically re-synchronize or invalidate all dependent fields (e.g., clearing visual range vectors).
+   (c) **Postcondition State Assertions**: Composite mutator methods must defensively assert internal consistency upon exit in Debug builds (e.g., asserting that collapsed states strictly contain empty auxiliary range vectors).
+15. **The Realistic Ingress Scaffolding Law (Anti-Synthetic Test Bias)**:
+   To prevent test scaffolding blindness where unit tests pass against idealized programmatic setters while real-world UI event dispatch paths fail:
+   (a) **Anti-Synthetic Bias Gate**: The Trapsmith is strictly prohibited from certifying interactive features using solely synthetic or direct state-forcing setters (e.g., calling `setSelection(pos1, pos2)` while bypassing real drag-hit-test calculations).
+   (b) **Mandatory Realistic Ingress Traps**: Interactive state machines (selections, focus, gesture tracking, keyboard modifiers) must have characterization and regression traps driven through the identical ingress pipeline used by the production harness (e.g., simulated pointer coordinate trajectories via `moveCaretToPoint`, realistic key event sequences).
+   (c) **Dual-Mode Verification**: Whenever a state mutation can be initiated programmatically or interactively, both ingress mechanisms must be tested in independent orthogonal test cases to prevent divergence between API behavior and user-driven behavior.
 
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
