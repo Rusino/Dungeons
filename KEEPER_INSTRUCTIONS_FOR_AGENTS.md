@@ -66,6 +66,7 @@ You are acting as an engine in **Project KEEPER**.
    (b) **Mandatory Hand-off Debt Ledger**: During Phase 10 (Interactive Hand-off), the agent is strictly prohibited from presenting a clean bill of health if unaddressed debt markers exist in modified code. The agent MUST execute a codebase scan for `TODO(KEEPER-DEBT)` across modified packages and present an explicit "Active Defensive Debt Ledger" in the dialogue.
    (c) **Direct Backlog Injection**: Every detected `TODO(KEEPER-DEBT)` marker automatically becomes a mandatory candidate item in the Forward Backlog presented to The Overgod. The agent cannot declare a subsystem feature-complete until all corresponding debt markers are replaced by fully implemented logic and verified by passing Trapsmith tests.
    (d) **The Deferred Trap Requirement**: Any code path protected by a `TODO(KEEPER-DEBT)` assertion must have an accompanying deferred test case in the test suite that clearly documents the expected input and the anticipated assertion trigger, ensuring the debt is concrete and executable.
+   (e) **Autonomous Milestone Invocation of The Oracle**: Prior to submitting a milestone or major feature to The Overgod for final sign-off, the lead agent is strictly prohibited from prompting the human for review without first autonomously invoking `invoke_subagent` with Role='The Oracle'. The agent must await The Oracle's formal Debt Clearance Report, verifying that all debt markers are either resolved or actively tracked in the Forward Backlog, before initiating Phase 9.
 13. **The Upstream Milestone Synchronization Protocol**:
    To eliminate drift between the local runtime operational codex (`AGENTS.md` in active project roots) and the canonical Master Constitution:
    (a) **Local Autonomous Supremacy**: During active sprint/bugfix cycles, agents operate directly and autonomously against the root `AGENTS.md` without requiring cross-repo synchronization on every micro-turn.
@@ -164,8 +165,16 @@ Assert: Test(Mutated_Refactored) == FAIL.
 [Fail]       [Pass]
   │             │
   ▼             ▼
-[Record in    [Phase 9: The Overgod Final Approval]
-Graveyard]    Human reviews diff for elegance and merges.
+[Record in    [Phase 8.5: The Oracle Autonomous Clearance Gate]
+Graveyard]    Lead agent autonomously invokes `invoke_subagent("The Oracle")`:
+              - Scan codebase for active TODO(KEEPER-DEBT) markers.
+              - Semantically verify debt validity / obsolete assertions.
+              - Verify 0-byte diff between local AGENTS.md and canonical Master Constitution.
+              Assert: Oracle_Verdict == GREEN.
+                     │
+                     ▼
+              [Phase 9: The Overgod Final Approval]
+              Human reviews diff for elegance and merges.
                     │
             [Defects Found]
                     ▼
