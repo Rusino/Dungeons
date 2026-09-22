@@ -5,49 +5,102 @@
 # Equips a new or existing repository with Project KEEPER operational rules,
 # subagent prompt templates, and domain invariants.
 #
-# Usage:
-#   ./init_project.sh <target_dir> [--domain text] [--link]
+# Defaults:
+#   - Target Directory: . (current working directory if omitted)
+#   - Linking:          --link (symlinks AGENTS.md and prompts for live updates)
+#   - Domain Codex:     --domain text (deploys Universal Text Domain as INVARIANTS.md)
 #
-# Options:
-#   --domain text    Copies the Universal Text Domain Codex as INVARIANTS.md
-#   --link           Symlinks AGENTS.md and prompts instead of copying
-#   --help           Show this message
+# Can be run from ANY directory:
+#   cd ~/Sources/my-project && ~/Sources/Dungeons/init_project.sh
 # ==============================================================================
 
 set -euo pipefail
 
+# Deterministically resolve the directory where this script and codex reside
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CODEX_DIR="${SCRIPT_DIR}/codex"
 
 usage() {
-    echo "Usage: $0 <target_directory> [--domain text] [--link]"
-    echo ""
-    echo "Options:"
-    echo "  --domain text    Deploy Tier-2 Universal Text Domain Codex to <target>/INVARIANTS.md"
-    echo "  --link           Symlink AGENTS.md and prompts to Dungeons (auto-updating)"
-    echo "  --help           Show this help message"
-    exit 1
+    cat << EOF
+==============================================================================
+Project KEEPER Bootstrapper (init_project.sh / init_keeper.sh)
+==============================================================================
+
+Equips any target repository with Project KEEPER's Master Constitution,
+subagent system prompts, domain invariants, and local harness configuration.
+
+USAGE:
+  $0 [target_directory] [options]
+
+ARGUMENTS:
+  target_directory    Path to the project to equip.
+                      Defaults to "." (current working directory) if omitted.
+
+OPTIONS:
+  --link              (DEFAULT) Create symbolic links to Dungeons for AGENTS.md
+                      and .antigravity/prompts/. Any updates pushed to Dungeons
+                      propagate automatically to this project.
+  --copy              Copy AGENTS.md and prompts instead of symlinking (useful
+                      if sharing the project with external collaborators).
+  --domain <name>     Deploy a Tier-2 domain codex to <target>/INVARIANTS.md.
+                      Options: 'text' (default), 'none'.
+                      Note: INVARIANTS.md is ALWAYS copied (never linked) so it
+                      can evolve locally and be committed to project history.
+  --no-domain         Skip creating INVARIANTS.md.
+  --help              Display this detailed help screen.
+
+WHERE CAN THIS SCRIPT BE RUN FROM?
+  You can run this script from ANY folder on your machine.
+  It uses BASH_SOURCE to deterministically locate the Dungeons codex directory,
+  regardless of your current working directory.
+
+EXAMPLES:
+  1. Bootstrap the project you are currently in (simplest, uses all defaults):
+     cd ~/Sources/my-text-editor
+     ~/Sources/Dungeons/init_project.sh
+
+  2. Bootstrap a project from inside the Dungeons repository:
+     cd ~/Sources/Dungeons
+     ./init_project.sh ~/Sources/my-text-editor
+
+  3. Bootstrap a non-text project (e.g. database/compiler) with no text invariants:
+     ~/Sources/Dungeons/init_project.sh ~/Sources/my-db --no-domain
+
+  4. Bootstrap a standalone project with full standalone copies (no symlinks):
+     ~/Sources/Dungeons/init_project.sh ~/Sources/my-project --copy
+
+==============================================================================
+EOF
+    exit 0
 }
 
-if [ $# -lt 1 ]; then
-    usage
-fi
-
 TARGET_DIR=""
-DOMAIN=""
-USE_LINK=false
+DOMAIN="text"
+USE_LINK=true
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --domain)
+            if [[ $# -lt 2 || "$2" =~ ^-- ]]; then
+                echo "Error: --domain requires a value (e.g. --domain text or --domain none)."
+                exit 1
+            fi
             DOMAIN="$2"
             shift 2
+            ;;
+        --no-domain)
+            DOMAIN="none"
+            shift
             ;;
         --link)
             USE_LINK=true
             shift
             ;;
-        --help)
+        --copy|--no-link)
+            USE_LINK=false
+            shift
+            ;;
+        --help|-h)
             usage
             ;;
         *)
@@ -62,9 +115,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Default to current working directory if target is not specified
 if [ -z "${TARGET_DIR}" ]; then
-    echo "Error: Target directory is required."
-    usage
+    TARGET_DIR="."
 fi
 
 if [ ! -d "${TARGET_DIR}" ]; then
@@ -76,15 +129,18 @@ TARGET_DIR="$(cd "${TARGET_DIR}" && pwd)"
 
 echo "=================================================================="
 echo "🛡️  Bootstrapping Project KEEPER in: ${TARGET_DIR}"
+echo "    Mode: $([ "${USE_LINK}" = true ] && echo "Live Symlinks (--link)" || echo "Standalone Copy (--copy)")"
+echo "    Domain Codex: ${DOMAIN}"
 echo "=================================================================="
 
 # 1. Deploy Master Constitution (Tier 1)
+CONSTITUTION_DEST="${TARGET_DIR}/AGENTS.md"
 if [ "${USE_LINK}" = true ]; then
     echo "==> Symlinking Master Constitution (codex/AGENTS.md -> AGENTS.md)..."
-    ln -sf "${CODEX_DIR}/AGENTS.md" "${TARGET_DIR}/AGENTS.md"
+    ln -sf "${CODEX_DIR}/AGENTS.md" "${CONSTITUTION_DEST}"
 else
     echo "==> Copying Master Constitution (codex/AGENTS.md -> AGENTS.md)..."
-    cp "${CODEX_DIR}/AGENTS.md" "${TARGET_DIR}/AGENTS.md"
+    cp "${CODEX_DIR}/AGENTS.md" "${CONSTITUTION_DEST}"
 fi
 
 # 2. Deploy Subagent System Prompts
@@ -102,13 +158,13 @@ else
     cp -r "${CODEX_DIR}/prompts/"*.md "${PROMPTS_DEST}/"
 fi
 
-# 3. Deploy Domain Invariants (Tier 2, always a copy)
+# 3. Deploy Domain Invariants (Tier 2, always an independent copy)
 if [ "${DOMAIN}" = "text" ]; then
     INVARIANTS_DEST="${TARGET_DIR}/INVARIANTS.md"
     if [ -f "${INVARIANTS_DEST}" ]; then
         echo "==> [NOTICE] Existing INVARIANTS.md detected. Preserving existing local invariants."
     else
-        echo "==> Deploying Tier-2 Universal Text Domain Codex (-> INVARIANTS.md)..."
+        echo "==> Deploying Tier-2 Universal Text Domain Codex (-> INVARIANTS.md copy)..."
         cp "${CODEX_DIR}/TEXT_DOMAIN.md" "${INVARIANTS_DEST}"
     fi
 fi
@@ -120,7 +176,7 @@ if [ ! -f "${CONFIG_FILE}" ]; then
     cat << 'EOF' > "${CONFIG_FILE}"
 # Project KEEPER: Local Harness Configuration
 
-Please fill in the project-specific execution commands so AI subagents can build and test deterministically:
+Please fill in project-specific execution commands so AI subagents can build and test deterministically:
 
 - **Build Command**: `ninja -C out/Debug <target>` # Or: cargo check, cmake --build, bazel build
 - **Unit Test Command**: `out/Debug/<test_binary> --match <Suite>` # Or: ctest, cargo test, bazel test
@@ -137,10 +193,10 @@ fi
 
 echo "=================================================================="
 echo "✅ Project KEEPER successfully bootstrapped in: ${TARGET_DIR}"
-echo "   - Tier 1 Constitution: ${TARGET_DIR}/AGENTS.md"
-echo "   - Subagent Prompts:    ${PROMPTS_DEST}/"
-if [ -n "${DOMAIN}" ]; then
-echo "   - Tier 2 Domain Codex: ${TARGET_DIR}/INVARIANTS.md"
+echo "   - Tier 1 Constitution: ${TARGET_DIR}/AGENTS.md $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
+echo "   - Subagent Prompts:    ${PROMPTS_DEST}/ $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
+if [ "${DOMAIN}" = "text" ]; then
+echo "   - Tier 2 Domain Codex: ${TARGET_DIR}/INVARIANTS.md (local copy)"
 fi
 echo "   - Local Config:        ${CONFIG_FILE}"
 echo "=================================================================="
