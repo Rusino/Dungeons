@@ -175,7 +175,7 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
 
 ## 3. The Entity & Role Matrix
 
-When operating on tasks, partition actions strictly into these distinct functional roles via `invoke_subagent`. Each subagent MUST be initialized with its canonical system prompt located in `.antigravity/prompts/<role>_system.md` (via `define_subagent` or passed to `invoke_subagent`):
+When operating on tasks, partition actions strictly into these distinct functional roles via `invoke_subagent`. Each subagent MUST be initialized with its canonical system prompt located in `codex/prompts/<role>_system.md` or `.antigravity/prompts/<role>_system.md` (via `define_subagent` or passed to `invoke_subagent`):
 
 | Role | Branch | Operational Directives |
 | :--- | :---: | :--- |
