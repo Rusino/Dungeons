@@ -31,17 +31,18 @@ The [`codex/`](codex/) directory contains the canonical operational codices read
 ## How to Adopt KEEPER in a New or Existing Project
 
 ### Option A: Automated 1-Command Bootstrap (Recommended)
-Use the included [`init_project.sh`](init_project.sh) script to deploy the constitution, subagent prompts, and domain invariants in one step:
+Use the included [`init_keeper.sh`](init_keeper.sh) script to deploy the constitution, subagent prompts, and domain invariants in one step:
 
 ```bash
-# Standard bootstrap:
-~/Sources/Dungeons/init_project.sh /path/to/my-project
+# Standard bootstrap (uses all defaults: --link and --domain text):
+cd /path/to/my-project
+~/Sources/Dungeons/init_keeper.sh
 
-# Bootstrap with Text Domain invariants:
-~/Sources/Dungeons/init_project.sh /path/to/my-project --domain text
+# Or run from inside Dungeons pointing to the project:
+~/Sources/Dungeons/init_keeper.sh /path/to/my-project
 
-# Bootstrap with live symlinks (auto-updates from Dungeons):
-~/Sources/Dungeons/init_project.sh /path/to/my-project --domain text --link
+# Bootstrap a standalone project with full copies (no symlinks):
+~/Sources/Dungeons/init_keeper.sh /path/to/my-project --copy
 ```
 
 ### Option B: Manual Adoption
@@ -70,7 +71,7 @@ Use the included [`init_project.sh`](init_project.sh) script to deploy the const
 ~/Sources/Dungeons/
 ├── README.md                                     # Project overview, adoption guide, directory map
 ├── KEEPER_INSTRUCTIONS_FOR_AGENTS.md             # Master Constitution (Root Copy)
-├── init_project.sh                               # 1-command automated project bootstrapper
+├── init_keeper.sh                                # 1-command automated project bootstrapper
 │
 ├── codex/                                        # Canonical Distribution Hub
 │   ├── AGENTS.md                                 # Tier 1 Master Constitution
