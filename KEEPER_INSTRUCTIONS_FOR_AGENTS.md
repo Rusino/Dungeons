@@ -27,6 +27,7 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
    Any subsystem, module, or tool with domain-specific invariants (e.g. typography rules, GPU pipeline constraints, audio synchronization, file system semantics) MUST maintain an `INVARIANTS.md` file in its source root.
    - **Constitutional Binding**: Local domain invariants carry the exact same binding authority as Tier 1 master invariants. An agent violating a local `INVARIANTS.md` rule is guilty of an identical protocol breach.
    - **Separation Mandate**: When an escape or defect occurs, the universal systems principle is recorded here in Tier 1; the concrete domain-specific rules, standards, and test matrices are recorded in the subsystem's local `INVARIANTS.md`.
+   - **Subsystem & Monorepo Isolation**: When Project KEEPER is adopted within a specific subsystem of a larger repository (e.g. a tool or module inside a monorepo), all KEEPER artifacts (`AGENTS.md`, `INVARIANTS.md`, `.antigravity/prompts/`) MUST reside strictly within that subsystem's directory. Polluting or modifying the parent repository root is strictly prohibited.
 
 ---
 

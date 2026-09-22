@@ -34,34 +34,51 @@ The [`codex/`](codex/) directory contains the canonical operational codices read
 Use the included [`init_keeper.sh`](init_keeper.sh) script to deploy the constitution, subagent prompts, and domain invariants in one step:
 
 ```bash
-# Standard bootstrap (uses all defaults: --link and --domain text):
+# 1. Standard bootstrap for a standalone project (uses defaults: --link and --domain text):
 cd /path/to/my-project
 ~/Sources/Dungeons/init_keeper.sh
 
-# Or run from inside Dungeons pointing to the project:
-~/Sources/Dungeons/init_keeper.sh /path/to/my-project
+# 2. Subsystem / Monorepo Isolation (Client Zero Pattern):
+# When working on a tool/subsystem within a larger monorepo (e.g. Skia, Chromium),
+# scope KEEPER strictly to the subsystem directory to keep the monorepo root pristine:
+~/Sources/Dungeons/init_keeper.sh /path/to/monorepo/tools/my_subsystem
 
-# Bootstrap a standalone project with full copies (no symlinks):
+# 3. Bootstrap a non-text engine (e.g. compiler, database) without text domain invariants:
+~/Sources/Dungeons/init_keeper.sh /path/to/my-project --no-domain
+
+# 4. Bootstrap a standalone project with full copies (no symlinks):
 ~/Sources/Dungeons/init_keeper.sh /path/to/my-project --copy
 ```
 
 ### Option B: Manual Adoption
-1. **Copy the Master Constitution**:
+1. **Deploy Master Constitution**:
+   Symlink (or copy) `codex/AGENTS.md` into your project or subsystem root:
    ```bash
-   cp ~/Sources/Dungeons/codex/AGENTS.md <your_project_root>/AGENTS.md
+   ln -sf ~/Sources/Dungeons/codex/AGENTS.md <your_subsystem>/AGENTS.md
    ```
-2. **Copy the Subagent Prompts**:
+2. **Deploy Subagent Prompts**:
+   Symlink (or copy) the 13 canonical subagent prompts:
    ```bash
-   mkdir -p <your_project_root>/.antigravity/prompts
-   cp ~/Sources/Dungeons/codex/prompts/*.md <your_project_root>/.antigravity/prompts/
+   mkdir -p <your_subsystem>/.antigravity/prompts
+   for p in ~/Sources/Dungeons/codex/prompts/*.md; do
+       ln -sf "$p" "<your_subsystem>/.antigravity/prompts/$(basename "$p")"
+   done
    ```
-3. **Add Domain Invariants (if applicable)**:
-   For text, typography, or editor projects:
+3. **Deploy Local Domain Invariants (Tier 2)**:
+   For text, typography, or editor projects, copy the domain template:
    ```bash
    cp ~/Sources/Dungeons/codex/TEXT_DOMAIN.md <your_subsystem>/INVARIANTS.md
    ```
 4. **Configure Local Build Toolchain**:
    See [`docs/BUILD_ADAPTERS.md`](docs/BUILD_ADAPTERS.md) for instructions on wiring GN/Ninja, CMake, Cargo, or Bazel into KEEPER's test gauntlet.
+
+---
+
+## Client Zero: The Text Editor Case Study
+
+The foundational proving ground for Project KEEPER was **Client Zero** (`skia/tools/text_editor` in the Skia repository). 
+
+By strictly applying the **Subsystem Isolation Pattern**, `tools/text_editor` operates under KEEPER governance (`AGENTS.md`, `INVARIANTS.md`, and `.antigravity/prompts/` live strictly inside `tools/text_editor/`) without altering, dirtying, or polluting the root of the Google Skia monorepo.
 
 ---
 

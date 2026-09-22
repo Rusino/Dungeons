@@ -26,14 +26,16 @@ usage() {
 Project KEEPER Bootstrapper (init_keeper.sh)
 ==============================================================================
 
-Equips any target repository with Project KEEPER's Master Constitution,
+Equips any target repository or subsystem with Project KEEPER's Master Constitution,
 subagent system prompts, domain invariants, and local harness configuration.
 
 USAGE:
   $0 [target_directory] [options]
 
 ARGUMENTS:
-  target_directory    Path to the project to equip.
+  target_directory    Path to the project or subsystem to equip.
+                      Can be a standalone repository root OR a subsystem/folder
+                      inside a larger monorepo (e.g. ~/Sources/skia/tools/text_editor).
                       Defaults to "." (current working directory) if omitted.
 
 OPTIONS:
@@ -54,14 +56,20 @@ WHERE CAN THIS SCRIPT BE RUN FROM?
   It uses BASH_SOURCE to deterministically locate the Dungeons codex directory,
   regardless of your current working directory.
 
+MONOREPO & SUBSYSTEM ISOLATION:
+  When working in a large monorepo (e.g. Chromium, Skia, Android), you should NOT
+  pollute the monorepo root with KEEPER files. Pass the specific subsystem path
+  as target_directory. Antigravity discovers rules hierarchically, so placing
+  AGENTS.md and .antigravity/prompts inside the subsystem activates KEEPER strictly
+  when working on that tool, leaving the monorepo root completely untouched.
+
 EXAMPLES:
-  1. Bootstrap the project you are currently in (simplest, uses all defaults):
+  1. Bootstrap the project/directory you are currently in:
      cd ~/Sources/my-text-editor
      ~/Sources/Dungeons/init_keeper.sh
 
-  2. Bootstrap a project from inside the Dungeons repository:
-     cd ~/Sources/Dungeons
-     ./init_keeper.sh ~/Sources/my-text-editor
+  2. Bootstrap a specific subsystem inside a monorepo (Client Zero pattern):
+     ~/Sources/Dungeons/init_keeper.sh ~/Sources/skia/tools/text_editor
 
   3. Bootstrap a non-text project (e.g. database/compiler) with no text invariants:
      ~/Sources/Dungeons/init_keeper.sh ~/Sources/my-db --no-domain
