@@ -48,7 +48,9 @@ OPTIONS:
                       Options: 'text' (default), 'none'.
                       Note: INVARIANTS.md is ALWAYS copied (never linked) so it
                       can evolve locally and be committed to project history.
-  --no-domain         Skip creating INVARIANTS.md.
+  --clean             (DEFAULT) Automatically detect and remove legacy orchestrator
+                      scripts (orchestrator.py, etc.) and broken symlinks.
+  --no-clean          Skip legacy file pruning and dead symlink cleanup.
   --help              Display this detailed help screen.
 
 WHERE CAN THIS SCRIPT BE RUN FROM?
@@ -85,6 +87,7 @@ EOF
 TARGET_DIR=""
 DOMAIN="text"
 USE_LINK=true
+CLEAN=true
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -106,6 +109,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --copy|--no-link)
             USE_LINK=false
+            shift
+            ;;
+        --clean)
+            CLEAN=true
+            shift
+            ;;
+        --no-clean)
+            CLEAN=false
             shift
             ;;
         --help|-h)
@@ -139,7 +150,52 @@ echo "=================================================================="
 echo "🛡️  Bootstrapping Project KEEPER in: ${TARGET_DIR}"
 echo "    Mode: $([ "${USE_LINK}" = true ] && echo "Live Symlinks (--link)" || echo "Standalone Copy (--copy)")"
 echo "    Domain Codex: ${DOMAIN}"
+echo "    Legacy Pruning: $([ "${CLEAN}" = true ] && echo "Active (--clean)" || echo "Disabled (--no-clean)")"
 echo "=================================================================="
+
+# 0. Prune Legacy Orchestrator Files & Dead Symlinks
+if [ "${CLEAN}" = true ]; then
+    echo "==> Checking for legacy or obsolete KEEPER artifacts (--clean)..."
+    LEGACY_FILES=(
+        "orchestrator.py"
+        "keeper_orchestrator.py"
+        "state_machine.py"
+        ".orchestrator_state.json"
+        ".orchestrator.state"
+    )
+    CLEANED_COUNT=0
+    for leg_file in "${LEGACY_FILES[@]}"; do
+        if [ -f "${TARGET_DIR}/${leg_file}" ] || [ -L "${TARGET_DIR}/${leg_file}" ]; then
+            echo "    [CLEAN] Removing obsolete orchestrator artifact: ${leg_file}"
+            rm -f "${TARGET_DIR}/${leg_file}"
+            CLEANED_COUNT=$((CLEANED_COUNT + 1))
+        fi
+    done
+
+    # Prune dead prompt symlinks in .antigravity/prompts/
+    if [ -d "${TARGET_DIR}/.antigravity/prompts" ]; then
+        for p in "${TARGET_DIR}/.antigravity/prompts"/*; do
+            if [ -L "${p}" ] && [ ! -e "${p}" ]; then
+                echo "    [CLEAN] Pruning dead prompt symlink: $(basename "${p}")"
+                rm -f "${p}"
+                CLEANED_COUNT=$((CLEANED_COUNT + 1))
+            fi
+        done
+    fi
+
+    # Prune dead root symlinks
+    for root_link in "${TARGET_DIR}/AGENTS.md" "${TARGET_DIR}/keeper.yaml" "${TARGET_DIR}/keeper"; do
+        if [ -L "${root_link}" ] && [ ! -e "${root_link}" ]; then
+            echo "    [CLEAN] Pruning broken symlink: $(basename "${root_link}")"
+            rm -f "${root_link}"
+            CLEANED_COUNT=$((CLEANED_COUNT + 1))
+        fi
+    done
+
+    if [ ${CLEANED_COUNT} -eq 0 ]; then
+        echo "    [CLEAN] Workspace clean. No obsolete artifacts detected."
+    fi
+fi
 
 # 1. Deploy Master Constitution (Tier 1)
 CONSTITUTION_DEST="${TARGET_DIR}/AGENTS.md"
@@ -199,6 +255,20 @@ See `docs/BUILD_ADAPTERS.md` in Dungeons for examples on wiring GN/Ninja, CMake,
 EOF
 fi
 
+# 5. Deploy Declarative Workflow (keeper.yaml)
+WORKFLOW_DEST="${TARGET_DIR}/keeper.yaml"
+if [ "${USE_LINK}" = true ]; then
+    echo "==> Symlinking Declarative Workflow (codex/keeper.yaml -> keeper.yaml)..."
+    ln -sf "${CODEX_DIR}/keeper.yaml" "${WORKFLOW_DEST}"
+else
+    echo "==> Copying Declarative Workflow (codex/keeper.yaml -> keeper.yaml)..."
+    cp "${CODEX_DIR}/keeper.yaml" "${WORKFLOW_DEST}"
+fi
+
+# 6. Deploy Runner Shortcut (keeper executable)
+RUNNER_DEST="${TARGET_DIR}/keeper"
+ln -sf "${SCRIPT_DIR}/keeper_runner.py" "${RUNNER_DEST}"
+
 echo "=================================================================="
 echo "✅ Project KEEPER successfully bootstrapped in: ${TARGET_DIR}"
 echo "   - Tier 1 Constitution: ${TARGET_DIR}/AGENTS.md $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
@@ -207,4 +277,6 @@ if [ "${DOMAIN}" = "text" ]; then
 echo "   - Tier 2 Domain Codex: ${TARGET_DIR}/INVARIANTS.md (local copy)"
 fi
 echo "   - Local Config:        ${CONFIG_FILE}"
+echo "   - Declarative Workflow:${WORKFLOW_DEST} $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
+echo "   - Deterministic Runner:${RUNNER_DEST} (run via ./keeper)"
 echo "=================================================================="

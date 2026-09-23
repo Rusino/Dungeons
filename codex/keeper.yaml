@@ -1,0 +1,212 @@
+version: "1.0"
+project: "KEEPER"
+description: "Project KEEPER Operational State Machine: Neuro-symbolic workflow with physical receipt gates."
+
+# ==============================================================================
+# GLOBAL CIRCUIT BREAKERS (Default safety invariants for all phases)
+# ==============================================================================
+circuit_breakers:
+  max_attempts: 3               # Strike limit: Halt after 3 failed attempts
+  step_timeout_seconds: 120     # Watchdog: Halt if execution hangs > 120s
+  max_diff_lines: 250           # Blast Radius: Halt if diff exceeds 250 lines
+  on_invariant_collision: halt  # Halt if conflicting rules are encountered
+
+# ==============================================================================
+# DEFAULT HARNESS CONFIGURATION (Can be overridden by KEEPER_CONFIG.md)
+# ==============================================================================
+config:
+  build_cmd: "ninja -C out/Debug dm"
+  test_cmd: "out/Debug/dm --match TextEditor"
+  compile_headers_cmd: "ninja -C out/Debug compile_headers"
+  sanitizer_cmd: "out/ASan/dm --match TextEditor"
+
+# ==============================================================================
+# WORKFLOW PHASES (Phases 1 through 11)
+# ==============================================================================
+phases:
+  # ----------------------------------------------------------------------------
+  # TIER 1: INCEPTION & SPECIFICATION
+  # ----------------------------------------------------------------------------
+  - id: 1
+    name: "Inception"
+    actor: "The Overgod"
+    interactive: true
+    prompt: "Submit task intent, defect description, or design proposal."
+    produces:
+      - "docs/**/*.md"
+    gate:
+      type: "file_exists"
+      target: "docs/**/*.md"
+
+  - id: 2
+    name: "Pre-Spec Inquisition"
+    actor: "The Invariant Inquisitor"
+    system_prompt: "codex/prompts/inquisitor_system.md"
+    interactive: true
+    requires:
+      - "docs/**/*.md"
+    gate:
+      type: "human_approval"
+      prompt: "Are all systems invariants (ABI, memory, performance, domain rules) locked?"
+
+  - id: 3
+    name: "Contract Generation"
+    actor: "The Architect"
+    system_prompt: "codex/prompts/architect_system.md"
+    interactive: false
+    produces:
+      - "include/**/*.h"
+    circuit_breakers:
+      max_diff_lines: 150
+      forbidden_paths:
+        - "src/**/*.cpp"
+        - "tests/**"
+    gate:
+      type: "file_exists"
+      target: "include/**/*.h"
+
+  - id: 3.5
+    name: "Overgod Contract Review"
+    actor: "The Overgod"
+    interactive: true
+    requires:
+      - "include/**/*.h"
+    gate:
+      type: "human_approval"
+      prompt: "Review contract diff in include/. Do you approve this interface?"
+
+  - id: 3.7
+    name: "Mechanical Syntactic Alignment"
+    actor: "The Artificer"
+    system_prompt: "codex/prompts/artificer_system.md"
+    conditional: "on_compilation_breakage"
+    interactive: false
+    circuit_breakers:
+      max_diff_lines: 200
+      forbidden_paths:
+        - "include/**"
+    gate:
+      type: "shell"
+      command: "{build_cmd}"
+      expected_exit_code: 0
+
+  # ----------------------------------------------------------------------------
+  # TIER 2: ADVERSARIAL TEST PINNING (GATE A)
+  # ----------------------------------------------------------------------------
+  - id: 4
+    name: "Pre-Flight Pinning"
+    actor: "The Trapsmith"
+    system_prompt: "codex/prompts/trapsmith_system.md"
+    interactive: false
+    produces:
+      - "tests/**/*"
+    circuit_breakers:
+      max_diff_lines: 100
+      forbidden_paths:
+        - "src/**"
+        - "include/**"
+        - "BUILD.gn"
+    gate:
+      type: "gate_a"
+      build_command: "{build_cmd}"
+      run_command: "{test_cmd}"
+      expected_exit_code: 1
+
+  - id: 5
+    name: "The Mimic (Gate A Audit)"
+    actor: "The Mimic"
+    system_prompt: "codex/prompts/mimic_system.md"
+    interactive: false
+    circuit_breakers:
+      forbidden_paths:
+        - "include/**"
+    gate:
+      type: "shell"
+      command: "python3 traps/mutation_gate.py --stage gate_a"
+      expected_exit_code: 0
+
+  # ----------------------------------------------------------------------------
+  # TIER 3: IMPLEMENTATION & VERIFICATION (GATE B)
+  # ----------------------------------------------------------------------------
+  - id: 6
+    name: "The Artificer Loop"
+    actor: "The Artificer"
+    system_prompt: "codex/prompts/artificer_system.md"
+    interactive: false
+    produces:
+      - "src/**/*.cpp"
+    circuit_breakers:
+      max_diff_lines: 300
+      forbidden_paths:
+        - "include/**"
+        - "tests/**"
+        - "BUILD.gn"
+    gate:
+      type: "gate_b"
+      build_command: "{build_cmd}"
+      run_command: "{test_cmd}"
+      expected_exit_code: 0
+
+  - id: 7
+    name: "The Mimic (Gate B Audit)"
+    actor: "The Mimic"
+    system_prompt: "codex/prompts/mimic_system.md"
+    interactive: false
+    gate:
+      type: "shell"
+      command: "python3 traps/mutation_gate.py --stage gate_b"
+      expected_exit_code: 0
+
+  - id: 8
+    name: "The Acid Pit (Sanitizers)"
+    actor: "The Acid Pit"
+    system_prompt: "codex/prompts/acid_pit_system.md"
+    interactive: false
+    circuit_breakers:
+      step_timeout_seconds: 300
+    gate:
+      type: "shell"
+      command: "{sanitizer_cmd}"
+      expected_exit_code: 0
+
+  - id: 8.6
+    name: "The Censor (Constitutional Hygiene)"
+    actor: "The Censor"
+    system_prompt: "codex/prompts/censor_system.md"
+    conditional: "on_milestone"
+    interactive: true
+    gate:
+      type: "human_approval"
+      prompt: "Review Censor Pruning RFC. Ratify constitutional changes?"
+
+  # ----------------------------------------------------------------------------
+  # TIER 4: RESOURCE PROFILING & HAND-OFF
+  # ----------------------------------------------------------------------------
+  - id: 9
+    name: "Cartographer & Quartermaster"
+    actor: "The Cartographer"
+    system_prompt: "codex/prompts/cartographer_system.md"
+    interactive: false
+    gate:
+      type: "shell"
+      command: "python3 traps/performance_auditor.py"
+      expected_exit_code: 0
+
+  - id: 10
+    name: "Interactive Hand-off"
+    actor: "The Overgod"
+    interactive: true
+    prompt: "All physical gates verified. Approve commit, debt ledger, and merge?"
+    gate:
+      type: "human_approval"
+      prompt: "Confirm branch readiness and release sign-off."
+
+  - id: 11
+    name: "The Coroner Protocol"
+    actor: "The Coroner"
+    system_prompt: "codex/prompts/coroner_system.md"
+    conditional: "on_defect_escape"
+    interactive: true
+    gate:
+      type: "human_approval"
+      prompt: "Approve 5-Whys inquest report and constitutional hardening patch?"
