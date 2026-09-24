@@ -24,6 +24,7 @@ import yaml
 
 try:
     from google.antigravity import Agent, LocalAgentConfig, CapabilitiesConfig
+    from google.antigravity.hooks import policy
     ANTIGRAVITY_AVAILABLE = True
 except ImportError:
     ANTIGRAVITY_AVAILABLE = False
@@ -78,7 +79,15 @@ class CircuitBreakerException(Exception):
 
 
 class KeeperRunner:
-    def __init__(self, config_path: str = "keeper.yaml", work_dir: str = ".", workflow: str = "feature"):
+    def __init__(
+        self,
+        config_path: str = "keeper.yaml",
+        work_dir: str = ".",
+        workflow: str = "feature",
+        is_milestone: bool = False,
+        is_defect_escape: bool = False,
+        strict: bool = False,
+    ):
         self.work_dir = Path(work_dir).resolve()
         self.config_path = self.work_dir / config_path
         if not self.config_path.exists():
@@ -93,6 +102,9 @@ class KeeperRunner:
             self.spec = yaml.safe_load(f)
 
         self.workflow = workflow
+        self.is_milestone = is_milestone
+        self.is_defect_escape = is_defect_escape
+        self.strict = strict
         self.global_breakers = self.spec.get("circuit_breakers", {})
         self.config_vars = self.spec.get("config", {})
         self._load_keeper_config_overrides()
@@ -194,7 +206,10 @@ class KeeperRunner:
         if state_path.exists():
             try:
                 with open(state_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                    s = json.load(f)
+                    if "last_build_failed" not in s:
+                        s["last_build_failed"] = False
+                    return s
             except Exception:
                 pass
 
@@ -204,6 +219,7 @@ class KeeperRunner:
             "attempt_counts": {},
             "status": "RUNNING",
             "last_halt_reason": None,
+            "last_build_failed": False,
         }
 
     def save_state(self):
@@ -221,6 +237,7 @@ class KeeperRunner:
             "attempt_counts": {},
             "status": "RUNNING",
             "last_halt_reason": None,
+            "last_build_failed": False,
         }
         self.save_state()
         mode_label = "Audit workflow" if self.workflow == "audit" else "State machine"
@@ -339,7 +356,10 @@ class KeeperRunner:
             log_progress(phase_name, "🔨", f"Building test binary: {build_cmd}")
             b_res = subprocess.run(build_cmd, shell=True, cwd=self.work_dir, capture_output=True, text=True)
             if b_res.returncode != 0:
+                self.state["last_build_failed"] = True
+                self.save_state()
                 return False, f"Compilation failed for Gate A test.\nStderr:\n{b_res.stderr[:300]}"
+            self.state["last_build_failed"] = False
 
             log_progress(phase_name, "🎯", f"Running Gate A defect reproduction trap: {run_cmd}")
             r_res = subprocess.run(run_cmd, shell=True, cwd=self.work_dir, capture_output=True, text=True)
@@ -358,7 +378,10 @@ class KeeperRunner:
             log_progress(phase_name, "🔨", f"Building implementation: {build_cmd}")
             b_res = subprocess.run(build_cmd, shell=True, cwd=self.work_dir, capture_output=True, text=True)
             if b_res.returncode != 0:
+                self.state["last_build_failed"] = True
+                self.save_state()
                 return False, f"Compilation failed for Gate B implementation.\nStderr:\n{b_res.stderr[:300]}"
+            self.state["last_build_failed"] = False
 
             log_progress(phase_name, "🎯", f"Running Gate B regression suite: {run_cmd}")
             r_res = subprocess.run(run_cmd, shell=True, cwd=self.work_dir, capture_output=True, text=True)
@@ -370,6 +393,111 @@ class KeeperRunner:
             return True, "Awaiting Overgod interactive input."
 
         return False, f"Unknown gate type: {gate_type}"
+
+    def should_execute_phase(self, phase: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Evaluates whether a conditional phase should execute or be skipped.
+        Returns (should_execute: bool, reason: str).
+        """
+        cond = phase.get("conditional")
+        if not cond:
+            return True, ""
+
+        if cond == "on_compilation_breakage":
+            if self.state.get("last_build_failed", False):
+                return True, "Triggered by compilation breakage in prior phase"
+            return False, "Skipped: Clean build; no syntactic compilation breakage"
+
+        elif cond == "on_milestone":
+            if self.is_milestone:
+                return True, "Triggered by --milestone flag"
+            return False, "Skipped: Routine feature run; milestone hygiene not requested (use --milestone to activate)"
+
+        elif cond == "on_defect_escape":
+            if self.is_defect_escape:
+                return True, "Triggered by --defect-escape flag"
+            return False, "Skipped: Clean feature run; no defect escape reported (use --defect-escape to activate)"
+
+        return True, ""
+
+    def validate_approval_prerequisites(self, phase: Dict[str, Any]) -> Tuple[bool, str]:
+        """
+        Physically validates that all required receipts and artifacts exist on disk
+        BEFORE allowing the Overgod to approve and advance past an interactive phase.
+        Prevents accidental approval bypass.
+        """
+        phase_id = phase["id"]
+        phase_name = f"Phase {phase_id}: {phase['name']}"
+
+        # 1. Check circuit breakers first
+        breakers = self.get_phase_breakers(phase)
+        try:
+            self.check_forbidden_paths(phase_name, breakers.get("forbidden_paths", []))
+            self.check_blast_radius(phase_name, breakers.get("max_diff_lines", 250))
+        except CircuitBreakerException as e:
+            return False, f"Circuit breaker tripped: {e}"
+
+        # 2. Check requires dependencies
+        requires_patterns = phase.get("requires", [])
+        for pat in requires_patterns:
+            pattern = str(self.work_dir / pat)
+            matches = glob.glob(pattern, recursive=True)
+            non_empty = [m for m in matches if os.path.isfile(m) and os.path.getsize(m) > 0]
+            if not non_empty:
+                return False, f"Prerequisite artifact missing: No non-empty file matching '{pat}' found."
+
+        # 3. Check produces artifacts if specified
+        produces_patterns = phase.get("produces", [])
+        for pat in produces_patterns:
+            pattern = str(self.work_dir / pat)
+            matches = glob.glob(pattern, recursive=True)
+            non_empty = [m for m in matches if os.path.isfile(m) and os.path.getsize(m) > 0]
+            if not non_empty:
+                return False, f"Mandatory produced artifact missing: No non-empty file matching '{pat}' found."
+
+        # 4. Check gate condition if not purely human_approval
+        gate = phase.get("gate", {})
+        gate_type = gate.get("type", "")
+        if gate_type == "file_exists":
+            target = gate.get("target")
+            pattern = str(self.work_dir / target)
+            matches = glob.glob(pattern, recursive=True)
+            non_empty = [m for m in matches if os.path.isfile(m) and os.path.getsize(m) > 0]
+            if not non_empty:
+                return False, f"Physical gate unsatisfied: Missing file '{target}'."
+        elif gate_type == "shell":
+            cmd = self._resolve_command(gate.get("command", ""))
+            expected = gate.get("expected_exit_code", 0)
+            res = subprocess.run(cmd, shell=True, cwd=self.work_dir, capture_output=True, text=True)
+            if res.returncode != expected:
+                return False, f"Gate command '{cmd}' failed (exit code {res.returncode}, expected {expected})."
+
+        return True, "All physical receipts and prerequisites verified."
+
+    def approve_current_phase(self) -> Tuple[bool, str]:
+        """
+        Approves the current interactive phase after validating physical receipts.
+        Returns (success: bool, message: str).
+        """
+        idx = self.state["current_phase_idx"]
+        if idx >= len(self.phases):
+            return False, "All phases already completed."
+
+        cur = self.phases[idx]
+        valid, reason = self.validate_approval_prerequisites(cur)
+        if not valid:
+            self.state["status"] = "HALTED"
+            self.state["last_halt_reason"] = f"Approval rejected on Phase {cur['id']}: {reason}"
+            self.save_state()
+            return False, reason
+
+        log_progress(f"Phase {cur['id']}", "✍️", "Overgod approval granted and physical receipts verified.", Colors.GREEN)
+        self.state["completed_phases"].append(cur["id"])
+        self.state["current_phase_idx"] = idx + 1
+        self.state["status"] = "RUNNING"
+        self.state["last_halt_reason"] = None
+        self.save_state()
+        return True, "Approval granted and physical receipts verified."
 
     def run_step(self, auto_advance: bool = True) -> bool:
         """
@@ -390,6 +518,17 @@ class KeeperRunner:
         actor = phase.get("actor", "Subagent")
         interactive = phase.get("interactive", False)
         breakers = self.get_phase_breakers(phase)
+
+        # 0. Conditional Phase Check
+        should_run, skip_reason = self.should_execute_phase(phase)
+        if not should_run:
+            log_progress(phase_name, "⏭️", f"Conditional phase skipped: {skip_reason}", Colors.BLUE)
+            self.state["completed_phases"].append(f"{phase_id} (skipped)")
+            self.state["current_phase_idx"] = idx + 1
+            self.save_state()
+            if auto_advance:
+                return self.run_step(auto_advance=True)
+            return True
 
         # 1. Safety Checks (Circuit Breakers)
         try:
@@ -566,9 +705,14 @@ class KeeperRunner:
 
         log_progress(f"Phase {phase_id}", "🤖", f"Spawning {actor} via Antigravity SDK...")
 
+        policies = []
+        if ANTIGRAVITY_AVAILABLE and "policy" in globals() and hasattr(policy, "allow_all"):
+            policies = [policy.allow_all()]
+
         config = LocalAgentConfig(
             system_instructions=system_instructions,
             capabilities=CapabilitiesConfig(),
+            policies=policies,
         )
 
         async with Agent(config) as agent:
@@ -616,6 +760,17 @@ class KeeperRunner:
                     return False
                 self.state["current_phase_idx"] = found_idx
                 self.save_state()
+                continue
+
+            # 0. Conditional Phase Check
+            should_run, skip_reason = self.should_execute_phase(phase)
+            if not should_run:
+                log_progress(phase_name, "⏭️", f"Conditional phase skipped: {skip_reason}", Colors.BLUE)
+                self.state["completed_phases"].append(f"{phase['id']} (skipped)")
+                self.state["current_phase_idx"] = idx + 1
+                self.save_state()
+                if target_phase_id is not None and str(target_phase_id) == phase_id:
+                    return True
                 continue
 
             # 1. Interactive Overgod Gate
@@ -780,11 +935,20 @@ def main():
     parser.add_argument("--drive", action="store_true", help="Autonomously drive phases using Antigravity SDK")
     parser.add_argument("--phase", type=str, default=None, help="Execute autonomous driver specifically for a given phase ID")
     parser.add_argument("--audit", action="store_true", help="Run the automated Inspection / General Health Audit gauntlet")
+    parser.add_argument("--milestone", action="store_true", help="Activate milestone-only conditional phases (e.g. Phase 8.6 The Censor)")
+    parser.add_argument("--defect-escape", action="store_true", help="Activate post-mortem defect inquest phases (e.g. Phase 11 The Coroner)")
+    parser.add_argument("--strict", action="store_true", help="Enforce strict verification gates without fallback")
     args = parser.parse_args()
 
     workflow = "audit" if args.audit else "feature"
     try:
-        runner = KeeperRunner(config_path=args.config, workflow=workflow)
+        runner = KeeperRunner(
+            config_path=args.config,
+            workflow=workflow,
+            is_milestone=args.milestone,
+            is_defect_escape=args.defect_escape,
+            strict=args.strict,
+        )
     except FileNotFoundError as e:
         print(f"{Colors.RED}Error: {e}{Colors.RESET}")
         sys.exit(1)
@@ -806,12 +970,19 @@ def main():
         idx = runner.state["current_phase_idx"]
         if idx < len(runner.phases):
             cur = runner.phases[idx]
-            log_progress(f"Phase {cur['id']}", "✍️", "Overgod approval granted.", Colors.GREEN)
-            runner.state["completed_phases"].append(cur["id"])
-            runner.state["current_phase_idx"] = idx + 1
-            runner.state["status"] = "RUNNING"
-            runner.state["last_halt_reason"] = None
-            runner.save_state()
+            ok, msg = runner.approve_current_phase()
+            if not ok:
+                print_dossier(
+                    phase_id=cur["id"],
+                    phase_name=cur["name"],
+                    actor=cur.get("actor", "The Overgod"),
+                    gate_status="APPROVAL REJECTED: PHYSICAL RECEIPT MISSING",
+                    evidence=msg,
+                    action_required=f"Cannot approve Phase {cur['id']}. Satisfy required physical receipts before approving.",
+                    is_halt=True,
+                )
+                sys.exit(1)
+
             if args.drive:
                 runner.run_drive()
             else:

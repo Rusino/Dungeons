@@ -305,8 +305,127 @@ class TestKeeperRunner(unittest.TestCase):
             self.assertEqual(runner.phases[cur_idx]["id"], "audit.report")
 
 
+    def test_conditional_phase_skipping(self):
+        """Proves that conditional phases are skipped unless their specific condition is satisfied."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+
+        # Test milestone conditional
+        milestone_phase = {"id": "8.6", "name": "The Censor", "conditional": "on_milestone"}
+        should_run, reason = runner.should_execute_phase(milestone_phase)
+        self.assertFalse(should_run)
+        self.assertIn("milestone", reason.lower())
+
+        # Test with is_milestone=True
+        m_runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir), is_milestone=True)
+        should_run, reason = m_runner.should_execute_phase(milestone_phase)
+        self.assertTrue(should_run)
+
+        # Test defect escape conditional
+        escape_phase = {"id": "11", "name": "The Coroner", "conditional": "on_defect_escape"}
+        should_run, reason = runner.should_execute_phase(escape_phase)
+        self.assertFalse(should_run)
+        self.assertIn("defect escape", reason.lower())
+
+        esc_runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir), is_defect_escape=True)
+        should_run, reason = esc_runner.should_execute_phase(escape_phase)
+        self.assertTrue(should_run)
+
+        # Test compilation breakage conditional
+        align_phase = {"id": "3.7", "name": "Syntactic Alignment", "conditional": "on_compilation_breakage"}
+        runner.state["last_build_failed"] = False
+        should_run, _ = runner.should_execute_phase(align_phase)
+        self.assertFalse(should_run)
+
+        runner.state["last_build_failed"] = True
+        should_run, _ = runner.should_execute_phase(align_phase)
+        self.assertTrue(should_run)
+
+    def test_approve_rejects_missing_receipts(self):
+        """Proves that approve_current_phase rejects approval when required physical artifacts are missing."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        runner.state["current_phase_idx"] = 0  # Phase 1 mandates produces: ["docs/*.md"]
+
+        # Attempt to approve without creating docs/*.md
+        ok, msg = runner.approve_current_phase()
+        self.assertFalse(ok)
+        self.assertIn("Mandatory produced artifact missing", msg)
+        self.assertEqual(runner.state["current_phase_idx"], 0)
+        self.assertEqual(runner.state["status"], "HALTED")
+
+        # Now create the required artifact
+        docs_dir = self.work_dir / "docs"
+        docs_dir.mkdir(parents=True, exist_ok=True)
+        (docs_dir / "RFC_test.md").write_text("# Test Inception Intent\n", encoding="utf-8")
+
+        # Approve again -> Must succeed!
+        ok, msg = runner.approve_current_phase()
+        self.assertTrue(ok)
+        self.assertEqual(runner.state["current_phase_idx"], 1)
+        self.assertEqual(runner.state["status"], "RUNNING")
+        self.assertIn(1, runner.state["completed_phases"])
+
+    def test_approve_validates_requires_prerequisites(self):
+        """Proves that approve validates requires patterns before permitting sign-off."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        phase_with_req = {
+            "id": 2.5,
+            "name": "Contract Sign-off",
+            "interactive": True,
+            "requires": ["include/*.h"],
+        }
+        valid, msg = runner.validate_approval_prerequisites(phase_with_req)
+        self.assertFalse(valid)
+        self.assertIn("Prerequisite artifact missing", msg)
+
+        # Create header
+        inc_dir = self.work_dir / "include"
+        inc_dir.mkdir(parents=True, exist_ok=True)
+        (inc_dir / "contract.h").write_text("#pragma once\n", encoding="utf-8")
+
+        valid, msg = runner.validate_approval_prerequisites(phase_with_req)
+        self.assertTrue(valid)
+
+    def test_mutation_engine_mutant_generation(self):
+        """Proves that the real mutation engine identifies C++ operators and generates mutations."""
+        from traps.mutation_gate import generate_mutants
+
+        test_cpp = self.work_dir / "sample.cpp"
+        test_cpp.write_text("bool check(int a, int b) {\n    return a == b;\n}\n", encoding="utf-8")
+
+        mutants = generate_mutants([test_cpp])
+        self.assertGreater(len(mutants), 0)
+        # Should detect '==' and propose '!='
+        self.assertTrue(any("!=" in m.mutated_line for m in mutants))
+
+    def test_performance_auditor_budget_enforcement(self):
+        """Proves that performance auditor rejects benchmarks that violate memory/latency budgets."""
+        from traps.performance_auditor import run_benchmark_audit
+
+        # Mock a benchmark run that exceeds memory allocation budget
+        mock_output = json.dumps({
+            "benchmarks": [
+                {
+                    "name": "BM_LeakyOperation",
+                    "cpu_time_ns": 50.0,
+                    "heap_allocations": 5  # Budget is 0!
+                }
+            ]
+        })
+
+        with patch("subprocess.run") as mock_sub:
+            mock_sub.return_value = MagicMock(returncode=0, stdout=mock_output, stderr="")
+            exit_code = run_benchmark_audit(
+                work_dir=self.work_dir,
+                cmd_str="./dummy_bench",
+                max_allocs=0,
+                max_ns=100.0,
+            )
+            self.assertEqual(exit_code, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
+
 
 
 
