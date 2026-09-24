@@ -87,13 +87,21 @@ By strictly applying the **Subsystem Isolation Pattern**, `tools/text_editor` op
 ```
 ~/Sources/Dungeons/
 ├── README.md                                     # Project overview, adoption guide, directory map
-├── KEEPER_INSTRUCTIONS_FOR_AGENTS.md             # Master Constitution (Root Copy)
+├── AGENTS.md                                     # Tier 1 Master Constitution (Symlink to codex/AGENTS.md)
 ├── init_keeper.sh                                # 1-command automated project bootstrapper
+│
+├── .agents/                                      # Antigravity Workspace Customizations
+│   └── skills/                                   # On-demand operational runbooks
+│       ├── keeper-debt-audit/                    # Axiom 12: Zero Dormant Debt & Ledger
+│       ├── keeper-inquisitor-review/             # Axiom 5, 6, 7, 15: Socratic Inquisitor Audit
+│       ├── keeper-dimensional-testing/           # Axiom 4, 11: Defect Pinning & 0D/1D/2D Matrix
+│       └── keeper-milestone-sync/                # Axiom 13: Upstream Milestone Synchronization
 │
 ├── codex/                                        # Canonical Distribution Hub
 │   ├── AGENTS.md                                 # Tier 1 Master Constitution
 │   ├── TEXT_DOMAIN.md                            # Tier 2 Universal Text Domain Codex
-│   └── prompts/                                  # Canonical Subagent System Prompts (13 roles)
+│   ├── prompts/                                  # Canonical Subagent System Prompts (13 roles)
+│   └── archive/                                  # Historical playbooks & artifacts
 │
 ├── docs/                                         # Architectural Documentation & RFCs
 │   ├── BUILD_ADAPTERS.md                         # Wiring GN, CMake, Cargo, Bazel into Gauntlet

@@ -184,7 +184,7 @@ if [ "${CLEAN}" = true ]; then
     fi
 
     # Prune dead root symlinks
-    for root_link in "${TARGET_DIR}/AGENTS.md" "${TARGET_DIR}/keeper.yaml" "${TARGET_DIR}/keeper" "${TARGET_DIR}/traps"; do
+    for root_link in "${TARGET_DIR}/AGENTS.md" "${TARGET_DIR}/keeper.yaml" "${TARGET_DIR}/keeper" "${TARGET_DIR}/traps" "${TARGET_DIR}/.agents/skills"; do
         if [ -L "${root_link}" ] && [ ! -e "${root_link}" ]; then
             echo "    [CLEAN] Pruning broken symlink: $(basename "${root_link}")"
             rm -f "${root_link}"
@@ -289,10 +289,23 @@ fi
 RUNNER_DEST="${TARGET_DIR}/keeper"
 ln -sf "${SCRIPT_DIR}/keeper_runner.py" "${RUNNER_DEST}"
 
+# 9. Deploy Modular Skills Catalog (.agents/skills/)
+SKILLS_DEST="${TARGET_DIR}/.agents/skills"
+mkdir -p "$(dirname "${SKILLS_DEST}")"
+if [ "${USE_LINK}" = true ]; then
+    echo "==> Symlinking Modular Skills (${SCRIPT_DIR}/.agents/skills -> .agents/skills)..."
+    ln -sfn "${SCRIPT_DIR}/.agents/skills" "${SKILLS_DEST}"
+else
+    echo "==> Copying Modular Skills (${SCRIPT_DIR}/.agents/skills -> .agents/skills)..."
+    mkdir -p "${SKILLS_DEST}"
+    cp -r "${SCRIPT_DIR}/.agents/skills/"* "${SKILLS_DEST}/"
+fi
+
 echo "=================================================================="
 echo "✅ Project KEEPER successfully bootstrapped in: ${TARGET_DIR}"
 echo "   - Tier 1 Constitution: ${TARGET_DIR}/AGENTS.md $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
 echo "   - Subagent Prompts:    ${PROMPTS_DEST}/ $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
+echo "   - Modular Skills:      ${SKILLS_DEST}/ $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
 if [ "${DOMAIN}" = "text" ]; then
 echo "   - Tier 2 Domain Codex: ${TARGET_DIR}/INVARIANTS.md (local copy)"
 fi
