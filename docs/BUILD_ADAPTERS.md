@@ -152,3 +152,47 @@ Execution:
 timeout 120s bazel test --config=asan //... --test_filter=<SuiteFilter>
 timeout 120s bazel test --config=tsan //... --test_filter=<SuiteFilter>
 ```
+
+---
+
+## 6. Continuous & Bounded Fuzz Testing Adapters (The Beholder Gate)
+
+Fuzz targets must link against coverage-guided fuzz engines (typically `libFuzzer` via `-fsanitize=fuzzer`) with ASan and UBSan enabled.
+
+### GN / Ninja (Skia / Chromium)
+```bash
+# Configure LibFuzzer + AddressSanitizer
+gn gen out/Fuzz --args='is_debug=false is_asan=true is_ubsan=true use_libfuzzer=true'
+ninja -C out/Fuzz <fuzzer_target>
+
+# Execute Fuzz Gate
+python3 traps/fuzz_gate.py --target out/Fuzz/<fuzzer_target> --timeout 15
+```
+
+### CMake / Ninja
+In `CMakeLists.txt`:
+```cmake
+if (ENABLE_FUZZING)
+    add_executable(fuzzer_beholder fuzz/fuzzer_target.cpp)
+    target_link_libraries(fuzzer_beholder PRIVATE <my_engine>)
+    target_compile_options(fuzzer_beholder PRIVATE -fsanitize=fuzzer,address,undefined)
+    target_link_options(fuzzer_beholder PRIVATE -fsanitize=fuzzer,address,undefined)
+endif()
+```
+Compilation & Execution:
+```bash
+cmake -B build/Fuzz -S . -G Ninja -DENABLE_FUZZING=ON -DCMAKE_CXX_COMPILER=clang++
+cmake --build build/Fuzz --target fuzzer_beholder
+python3 traps/fuzz_gate.py --target build/Fuzz/fuzzer_beholder --timeout 15
+```
+
+### Cargo (Rust)
+Using `cargo-fuzz` / `libfuzzer-sys`:
+```bash
+# Initialize fuzzing harness
+cargo fuzz init
+
+# Run bounded fuzz gate
+python3 traps/fuzz_gate.py --target "cargo fuzz run <fuzz_target> fuzz/corpus -- -max_total_time=15"
+```
+

@@ -19,6 +19,7 @@ config:
   test_cmd: "out/Debug/dm --match TextEditor"
   compile_headers_cmd: "ninja -C out/Debug compile_headers"
   sanitizer_cmd: "out/ASan/dm --match TextEditor"
+  fuzz_cmd: "python3 traps/fuzz_gate.py"
 
 # ==============================================================================
 # WORKFLOW PHASES (Phases 1 through 11)
@@ -169,6 +170,18 @@ phases:
       command: "{sanitizer_cmd}"
       expected_exit_code: 0
 
+  - id: 8.5
+    name: "The Beholder (Continuous & Bounded Fuzz Gate)"
+    actor: "The Beholder"
+    system_prompt: "codex/prompts/beholder_system.md"
+    interactive: false
+    circuit_breakers:
+      step_timeout_seconds: 180
+    gate:
+      type: "shell"
+      command: "{fuzz_cmd}"
+      expected_exit_code: 0
+
   - id: 8.6
     name: "The Censor (Constitutional Hygiene)"
     actor: "The Censor"
@@ -210,3 +223,53 @@ phases:
     gate:
       type: "human_approval"
       prompt: "Approve 5-Whys inquest report and constitutional hardening patch?"
+
+# ==============================================================================
+# AUDIT WORKFLOW (Used via ./keeper --audit)
+# ==============================================================================
+audit_phases:
+  - id: "audit.build"
+    name: "Compilation & Link Integrity"
+    actor: "The Artificer"
+    interactive: false
+    gate:
+      type: "shell"
+      command: "{build_cmd}"
+      expected_exit_code: 0
+
+  - id: "audit.test"
+    name: "Unit Test Suite"
+    actor: "The Trapsmith"
+    interactive: false
+    gate:
+      type: "shell"
+      command: "{test_cmd}"
+      expected_exit_code: 0
+
+  - id: "audit.fuzz"
+    name: "The Beholder (Bounded Fuzz Gate)"
+    actor: "The Beholder"
+    interactive: false
+    gate:
+      type: "shell"
+      command: "{fuzz_cmd}"
+      expected_exit_code: 0
+
+  - id: "audit.sanitizers"
+    name: "The Acid Pit (Sanitizers)"
+    actor: "The Acid Pit"
+    interactive: false
+    gate:
+      type: "shell"
+      command: "{sanitizer_cmd}"
+      expected_exit_code: 0
+
+  - id: "audit.report"
+    name: "Health Dossier Ratification"
+    actor: "The Overgod"
+    interactive: true
+    prompt: "All physical health checks verified. Ratify clean engine health status?"
+    gate:
+      type: "human_approval"
+      prompt: "Confirm clean engine health."
+

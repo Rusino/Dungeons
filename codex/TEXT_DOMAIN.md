@@ -140,3 +140,20 @@ It is independent of any specific UI framework, engine architecture, or class na
    - Insertions are contiguous;
    - Keystrokes do not cross word boundaries (whitespace, punctuation, newline) or directionality boundaries.
    Non-typing commands (navigation, paste, cut, block selection) must never be coalesced.
+
+---
+
+### Invariant 13: Continuous Fuzzing & Invariant Verification Matrix
+
+1. **Differential Buffer Model Equivalence**:
+   Any optimized text storage engine (piece table, rope, gap buffer) must be continuously fuzzed against a naive sequential string/array reference model under randomized mutation streams ($\text{Insert}, \text{Delete}, \text{Replace}$). At every mutation step:
+   $$\text{buffer.to_string}() == \text{reference_model.to_string}()$$
+   $$\text{buffer.length}() == \text{reference_model.length}()$$
+2. **Deterministic Reversibility Fuzzing**:
+   Random sequences of $N$ edits followed by $N$ undos must restore the exact initial document state and cursor projection:
+   $$\text{undo}^N(\text{apply}_N(\dots \text{apply}_1(\text{state}))) == \text{state}$$
+3. **Malformed & Truncated Ingress Bombardment**:
+   Shapers, parsers, and hit-testing engines must be continuously fuzzed with corrupted UTF-8 byte streams, unpaired surrogates, trailing joiners, and mixed line breaks. Under no input may the engine crash, panic, leak memory, or hang in an infinite loop.
+4. **Indivisible Boundary Invariant**:
+   Fuzz testing of cursor navigation and deletion over arbitrary Unicode text must assert that the caret NEVER rests inside a surrogate pair, between `\r` and `\n`, or inside an extended grapheme cluster.
+

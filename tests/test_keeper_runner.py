@@ -216,6 +216,97 @@ class TestKeeperRunner(unittest.TestCase):
             self.assertIn(2, runner.state["completed_phases"])
             self.assertIn(3, runner.state["completed_phases"])
 
+    def test_fuzz_config_override(self):
+        """Proves that KEEPER_CONFIG.md overrides fuzz_cmd."""
+        cfg_path = self.work_dir / "KEEPER_CONFIG.md"
+        cfg_path.write_text(
+            "# Config\n- **Fuzz Command**: `out/Fuzz/custom_fuzzer`\n",
+            encoding="utf-8",
+        )
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        self.assertEqual(runner.config_vars.get("fuzz_cmd"), "out/Fuzz/custom_fuzzer")
+
+    def test_beholder_fuzz_gate_evaluation(self):
+        """Proves that The Beholder fuzz gate resolves command and evaluates successfully."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        runner.config_vars["fuzz_cmd"] = "echo 'fuzz passed'"
+        phase = {
+            "id": 8.5,
+            "name": "The Beholder",
+            "gate": {"type": "shell", "command": "{fuzz_cmd}", "expected_exit_code": 0},
+        }
+        success, evidence = runner.evaluate_gate(phase)
+        self.assertTrue(success)
+        self.assertIn("expected code 0", evidence)
+
+    def test_run_drive_stops_at_interactive_phase(self):
+        """Proves that run_drive pauses cleanly at interactive phases for Overgod review."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        runner.state["current_phase_idx"] = 0  # Phase 1 is interactive
+        with patch.object(runner, "dispatch_phase_worker") as mock_dispatch:
+            res = runner.run_drive()
+            self.assertTrue(res)
+            # Worker must NOT be dispatched for interactive human phases
+            mock_dispatch.assert_not_called()
+            self.assertEqual(runner.state["current_phase_idx"], 0)
+
+    def test_run_drive_dispatches_worker_and_advances(self):
+        """Proves that run_drive dispatches worker for automated phases and auto-advances on gate pass."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        runner.state["current_phase_idx"] = 1  # Start at Phase 2 (automated)
+
+        with patch.object(runner, "dispatch_phase_worker", return_value=True) as mock_dispatch, \
+             patch.object(runner, "evaluate_gate", return_value=(True, "Receipt verified")):
+            res = runner.run_drive()
+            self.assertTrue(res)
+            self.assertEqual(mock_dispatch.call_count, 2)  # Dispatched for Phase 2 and Phase 3
+            self.assertEqual(runner.state["status"], "COMPLETED")
+            self.assertIn(2, runner.state["completed_phases"])
+            self.assertIn(3, runner.state["completed_phases"])
+
+    def test_run_drive_retries_with_feedback(self):
+        """Proves that run_drive feeds failure stderr back into retry attempts."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        runner.state["current_phase_idx"] = 1  # Phase 2 (automated)
+
+        gate_evaluations = [
+            (False, "Compilation error on line 42"),
+            (True, "All tests passed cleanly"),
+        ]
+
+        with patch.object(runner, "dispatch_phase_worker", return_value=True) as mock_dispatch, \
+             patch.object(runner, "evaluate_gate", side_effect=gate_evaluations):
+            res = runner.run_drive(target_phase_id=2)
+            self.assertTrue(res)
+            self.assertEqual(mock_dispatch.call_count, 2)
+            # Verify attempt 1 had no feedback, but attempt 2 had the error feedback
+            mock_dispatch.assert_any_call(runner.phases[1], error_feedback=None)
+            mock_dispatch.assert_any_call(runner.phases[1], error_feedback="Compilation error on line 42")
+            self.assertIn(2, runner.state["completed_phases"])
+
+    def test_audit_workflow_initialization(self):
+        """Proves that workflow='audit' initializes audit phases and separate state file."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir), workflow="audit")
+        self.assertEqual(runner.workflow, "audit")
+        self.assertEqual(runner.state_file, ".keeper/audit_state.json")
+        self.assertTrue(len(runner.phases) > 0)
+        # Verify first phase is build check
+        self.assertEqual(runner.phases[0]["id"], "audit.build")
+
+    def test_audit_workflow_auto_advance(self):
+        """Proves that audit workflow executes automated gates and pauses at report ratification."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir), workflow="audit")
+        # Mock evaluate_gate to pass for all automated checks
+        with patch.object(runner, "evaluate_gate", return_value=(True, "Check passed")):
+            runner.run_step(auto_advance=True)
+            # Should advance past all automated phases and pause at the interactive audit.report phase
+            cur_idx = runner.state["current_phase_idx"]
+            self.assertTrue(runner.phases[cur_idx].get("interactive"))
+            self.assertEqual(runner.phases[cur_idx]["id"], "audit.report")
+
 
 if __name__ == "__main__":
     unittest.main()
+
+
+

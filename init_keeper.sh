@@ -184,7 +184,7 @@ if [ "${CLEAN}" = true ]; then
     fi
 
     # Prune dead root symlinks
-    for root_link in "${TARGET_DIR}/AGENTS.md" "${TARGET_DIR}/keeper.yaml" "${TARGET_DIR}/keeper"; do
+    for root_link in "${TARGET_DIR}/AGENTS.md" "${TARGET_DIR}/keeper.yaml" "${TARGET_DIR}/keeper" "${TARGET_DIR}/traps"; do
         if [ -L "${root_link}" ] && [ ! -e "${root_link}" ]; then
             echo "    [CLEAN] Pruning broken symlink: $(basename "${root_link}")"
             rm -f "${root_link}"
@@ -244,6 +244,7 @@ Please fill in project-specific execution commands so AI subagents can build and
 
 - **Build Command**: `ninja -C out/Debug <target>` # Or: cargo check, cmake --build, bazel build
 - **Unit Test Command**: `out/Debug/<test_binary> --match <Suite>` # Or: ctest, cargo test, bazel test
+- **Fuzz Command**: `python3 traps/fuzz_gate.py` # Or: out/Fuzz/<fuzz_target>
 - **Incremental Build Timeout**: `60s`
 - **Fast Unit Test Timeout**: `10s`
 - **Sanitizer Matrix**:
@@ -255,7 +256,26 @@ See `docs/BUILD_ADAPTERS.md` in Dungeons for examples on wiring GN/Ninja, CMake,
 EOF
 fi
 
-# 5. Deploy Declarative Workflow (keeper.yaml)
+# 5. Scaffold Fuzzing Regression Corpus Directory
+CORPUS_DEST="${TARGET_DIR}/fuzz/corpus"
+if [ ! -d "${CORPUS_DEST}" ]; then
+    echo "==> Scaffolding Fuzzing Corpus Directory (fuzz/corpus)..."
+    mkdir -p "${CORPUS_DEST}"
+    touch "${CORPUS_DEST}/.keep"
+fi
+
+# 6. Deploy Verification Traps (traps/)
+TRAPS_DEST="${TARGET_DIR}/traps"
+if [ "${USE_LINK}" = true ]; then
+    echo "==> Symlinking Verification Traps (${SCRIPT_DIR}/traps -> traps)..."
+    ln -sfn "${SCRIPT_DIR}/traps" "${TRAPS_DEST}"
+else
+    echo "==> Copying Verification Traps (${SCRIPT_DIR}/traps -> traps)..."
+    mkdir -p "${TRAPS_DEST}"
+    cp -r "${SCRIPT_DIR}/traps/"* "${TRAPS_DEST}/"
+fi
+
+# 7. Deploy Declarative Workflow (keeper.yaml)
 WORKFLOW_DEST="${TARGET_DIR}/keeper.yaml"
 if [ "${USE_LINK}" = true ]; then
     echo "==> Symlinking Declarative Workflow (codex/keeper.yaml -> keeper.yaml)..."
@@ -265,7 +285,7 @@ else
     cp "${CODEX_DIR}/keeper.yaml" "${WORKFLOW_DEST}"
 fi
 
-# 6. Deploy Runner Shortcut (keeper executable)
+# 8. Deploy Runner Shortcut (keeper executable)
 RUNNER_DEST="${TARGET_DIR}/keeper"
 ln -sf "${SCRIPT_DIR}/keeper_runner.py" "${RUNNER_DEST}"
 
@@ -277,6 +297,9 @@ if [ "${DOMAIN}" = "text" ]; then
 echo "   - Tier 2 Domain Codex: ${TARGET_DIR}/INVARIANTS.md (local copy)"
 fi
 echo "   - Local Config:        ${CONFIG_FILE}"
+echo "   - Fuzz Seed Corpus:    ${CORPUS_DEST}/"
+echo "   - Verification Traps:  ${TRAPS_DEST}/"
 echo "   - Declarative Workflow:${WORKFLOW_DEST} $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
 echo "   - Deterministic Runner:${RUNNER_DEST} (run via ./keeper)"
 echo "=================================================================="
+

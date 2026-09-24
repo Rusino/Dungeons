@@ -8,6 +8,7 @@ Zero-bother execution: auto-advances on green; halts hard on red.
 """
 
 import argparse
+import asyncio
 import fnmatch
 import glob
 import json
@@ -20,6 +21,12 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
+try:
+    from google.antigravity import Agent, LocalAgentConfig, CapabilitiesConfig
+    ANTIGRAVITY_AVAILABLE = True
+except ImportError:
+    ANTIGRAVITY_AVAILABLE = False
 
 STATE_FILE = ".keeper/state.json"
 
@@ -71,7 +78,7 @@ class CircuitBreakerException(Exception):
 
 
 class KeeperRunner:
-    def __init__(self, config_path: str = "keeper.yaml", work_dir: str = "."):
+    def __init__(self, config_path: str = "keeper.yaml", work_dir: str = ".", workflow: str = "feature"):
         self.work_dir = Path(work_dir).resolve()
         self.config_path = self.work_dir / config_path
         if not self.config_path.exists():
@@ -85,12 +92,78 @@ class KeeperRunner:
         with open(self.config_path, "r", encoding="utf-8") as f:
             self.spec = yaml.safe_load(f)
 
+        self.workflow = workflow
         self.global_breakers = self.spec.get("circuit_breakers", {})
         self.config_vars = self.spec.get("config", {})
         self._load_keeper_config_overrides()
 
-        self.phases = self.spec.get("phases", [])
+        if self.workflow == "audit":
+            self.phases = self.spec.get("audit_phases") or self._get_default_audit_phases()
+            self.state_file = ".keeper/audit_state.json"
+        else:
+            self.phases = self.spec.get("phases", [])
+            self.state_file = STATE_FILE
+
         self.state = self._load_state()
+
+    def _get_default_audit_phases(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "id": "audit.build",
+                "name": "Compilation & Link Integrity",
+                "actor": "The Artificer",
+                "interactive": False,
+                "gate": {
+                    "type": "shell",
+                    "command": "{build_cmd}",
+                    "expected_exit_code": 0,
+                },
+            },
+            {
+                "id": "audit.test",
+                "name": "Unit Test Suite",
+                "actor": "The Trapsmith",
+                "interactive": False,
+                "gate": {
+                    "type": "shell",
+                    "command": "{test_cmd}",
+                    "expected_exit_code": 0,
+                },
+            },
+            {
+                "id": "audit.fuzz",
+                "name": "The Beholder (Bounded Fuzz Gate)",
+                "actor": "The Beholder",
+                "interactive": False,
+                "gate": {
+                    "type": "shell",
+                    "command": "{fuzz_cmd}",
+                    "expected_exit_code": 0,
+                },
+            },
+            {
+                "id": "audit.sanitizers",
+                "name": "The Acid Pit (Sanitizers)",
+                "actor": "The Acid Pit",
+                "interactive": False,
+                "gate": {
+                    "type": "shell",
+                    "command": "{sanitizer_cmd}",
+                    "expected_exit_code": 0,
+                },
+            },
+            {
+                "id": "audit.report",
+                "name": "Health Dossier Ratification",
+                "actor": "The Overgod",
+                "interactive": True,
+                "prompt": "All physical health checks verified. Ratify clean engine health status?",
+                "gate": {
+                    "type": "human_approval",
+                    "prompt": "Confirm clean engine health.",
+                },
+            },
+        ]
 
     def _load_keeper_config_overrides(self):
         """Loads project-specific commands from KEEPER_CONFIG.md if present."""
@@ -111,9 +184,13 @@ class KeeperRunner:
         if asan_match:
             self.config_vars["sanitizer_cmd"] = asan_match.group(1).strip()
 
+        fuzz_match = re.search(r"\*\*Fuzz(?:ing)? Command\*\*:\s*`([^`]+)`", text)
+        if fuzz_match:
+            self.config_vars["fuzz_cmd"] = fuzz_match.group(1).strip()
+
     def _load_state(self) -> Dict[str, Any]:
-        """Loads state from .keeper/state.json or initializes default state."""
-        state_path = self.work_dir / STATE_FILE
+        """Loads state from configured state file or initializes default state."""
+        state_path = self.work_dir / self.state_file
         if state_path.exists():
             try:
                 with open(state_path, "r", encoding="utf-8") as f:
@@ -130,14 +207,14 @@ class KeeperRunner:
         }
 
     def save_state(self):
-        """Persists state to .keeper/state.json."""
-        state_dir = self.work_dir / ".keeper"
-        state_dir.mkdir(parents=True, exist_ok=True)
-        with open(state_dir / "state.json", "w", encoding="utf-8") as f:
+        """Persists state to configured state file."""
+        state_path = self.work_dir / self.state_file
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(state_path, "w", encoding="utf-8") as f:
             json.dump(self.state, f, indent=2)
 
     def reset_state(self):
-        """Resets the state machine back to Phase 1."""
+        """Resets the state machine back to initial phase."""
         self.state = {
             "current_phase_idx": 0,
             "completed_phases": [],
@@ -146,7 +223,8 @@ class KeeperRunner:
             "last_halt_reason": None,
         }
         self.save_state()
-        log_progress("", "🔄", "State machine reset to Phase 1.", Colors.GREEN)
+        mode_label = "Audit workflow" if self.workflow == "audit" else "State machine"
+        log_progress("", "🔄", f"{mode_label} reset to initial phase.", Colors.GREEN)
 
     def get_phase_breakers(self, phase: Dict[str, Any]) -> Dict[str, Any]:
         """Merges global circuit breaker defaults with phase-specific overrides."""
@@ -404,11 +482,266 @@ class KeeperRunner:
 
         return True
 
+    async def dispatch_phase_worker(
+        self, phase: Dict[str, Any], error_feedback: Optional[str] = None
+    ) -> bool:
+        """
+        Dispatches an autonomous Antigravity subagent strictly scoped to this phase.
+        Loads the specific role system prompt (e.g. trapsmith_system.md) and task prompt.
+        """
+        if not ANTIGRAVITY_AVAILABLE:
+            raise RuntimeError(
+                "Antigravity SDK (google-antigravity) is not installed in the environment."
+            )
+
+        phase_id = phase["id"]
+        phase_name = phase["name"]
+        actor = phase.get("actor", "Subagent")
+
+        # 1. Resolve system prompt
+        sys_prompt_file = phase.get("system_prompt")
+        system_instructions = ""
+        if sys_prompt_file:
+            candidates = [
+                self.work_dir / sys_prompt_file,
+                self.work_dir / "codex" / "prompts" / Path(sys_prompt_file).name,
+                self.work_dir / ".antigravity" / "prompts" / Path(sys_prompt_file).name,
+            ]
+            for c in candidates:
+                if c.exists():
+                    system_instructions = c.read_text(encoding="utf-8")
+                    break
+
+        if not system_instructions:
+            system_instructions = (
+                f"You are {actor} in Project KEEPER. You must strictly execute your designated phase mandate."
+            )
+
+        # 2. Construct constrained task prompt
+        prompt_parts = [
+            f"# Project KEEPER: Phase {phase_id} ({phase_name})",
+            f"**Assigned Actor**: {actor}",
+            f"**Workspace**: `{self.work_dir}`",
+        ]
+
+        if phase.get("prompt"):
+            prompt_parts.append(f"**Directive**: {phase['prompt']}")
+
+        if phase.get("produces"):
+            prompt_parts.append(f"**Target Outputs**: {', '.join(phase['produces'])}")
+
+        breakers = self.get_phase_breakers(phase)
+        forbidden = breakers.get("forbidden_paths")
+        if forbidden:
+            prompt_parts.append(
+                f"⛔ **FORBIDDEN PATHS**: You are STRICTLY PROHIBITED from modifying or creating files matching:\n"
+                + "\n".join(f"  - `{p}`" for p in forbidden)
+            )
+
+        gate = phase.get("gate", {})
+        gate_type = gate.get("type", "shell")
+        if gate_type == "gate_a":
+            prompt_parts.append(
+                "🎯 **Gate A Trap Mandate**: Write a hostile test that COMPORTS with the codebase (builds with exit code 0) "
+                "AND MUST FAIL on the current unmodified code (exit non-zero) to prove defect sensitivity. "
+                "Do NOT fix or touch production code."
+            )
+        elif gate_type == "gate_b":
+            prompt_parts.append(
+                "🎯 **Gate B Verification Mandate**: Implement the logic so that the build succeeds AND all tests pass (exit code 0)."
+            )
+        elif gate_type == "file_exists":
+            prompt_parts.append(f"🎯 **Receipt Mandate**: Create the required physical artifact: `{gate.get('target')}`")
+        elif gate_type == "shell":
+            prompt_parts.append(f"🎯 **Receipt Mandate**: Fulfill condition checked by command: `{gate.get('command')}`")
+
+        if error_feedback:
+            prompt_parts.append(
+                f"\n⚠️ **PREVIOUS ATTEMPT FAILED WITH PHYSICAL RECEIPT REJECTION**:\n"
+                f"```\n{error_feedback}\n```\n"
+                f"Inspect the exact compiler/test failure above, locate the flaw, and fix it."
+            )
+
+        task_prompt = "\n\n".join(prompt_parts)
+
+        log_progress(f"Phase {phase_id}", "🤖", f"Spawning {actor} via Antigravity SDK...")
+
+        config = LocalAgentConfig(
+            system_instructions=system_instructions,
+            capabilities=CapabilitiesConfig(),
+        )
+
+        async with Agent(config) as agent:
+            response = await agent.chat(task_prompt)
+            async for token in response:
+                sys.stdout.write(token)
+                sys.stdout.flush()
+            print()
+
+        return True
+
+    def run_drive(self, target_phase_id: Optional[Any] = None) -> bool:
+        """
+        Autonomously drives the KEEPER workflow using Antigravity workers.
+        - Stops at interactive gates for Overgod review.
+        - Spawns worker agents with isolated prompts for automated phases.
+        - Evaluates circuit breakers (blast radius, forbidden paths) and gates.
+        - Automatically feeds compiler/test failures back into retry attempts.
+        - Commits verified milestones and auto-advances.
+        """
+        while True:
+            idx = self.state["current_phase_idx"]
+            if idx >= len(self.phases):
+                log_progress("", "🏆", "All KEEPER phases completed successfully!", Colors.GREEN)
+                self.state["status"] = "COMPLETED"
+                self.save_state()
+                return True
+
+            phase = self.phases[idx]
+            phase_id = str(phase["id"])
+            phase_name = f"Phase {phase['id']}: {phase['name']}"
+            actor = phase.get("actor", "Subagent")
+            interactive = phase.get("interactive", False)
+            breakers = self.get_phase_breakers(phase)
+
+            # If user targeted a specific phase
+            if target_phase_id is not None and str(target_phase_id) != phase_id:
+                found_idx = None
+                for i, p in enumerate(self.phases):
+                    if str(p["id"]) == str(target_phase_id):
+                        found_idx = i
+                        break
+                if found_idx is None:
+                    print(f"{Colors.RED}Target phase {target_phase_id} not found.{Colors.RESET}")
+                    return False
+                self.state["current_phase_idx"] = found_idx
+                self.save_state()
+                continue
+
+            # 1. Interactive Overgod Gate
+            if interactive:
+                prompt_text = phase.get("gate", {}).get("prompt", phase.get("prompt", "Approval required."))
+                print_dossier(
+                    phase_id=phase["id"],
+                    phase_name=phase["name"],
+                    actor=actor,
+                    gate_status="AWAITING OVERGOD APPROVAL",
+                    evidence="Phase requires explicit human architectural review.",
+                    action_required=f"ACTION REQUIRED: {prompt_text}\n(Run `./keeper --approve` to ratify and advance)",
+                    is_halt=False,
+                )
+                return True
+
+            # 2. Automated Phase Worker Loop
+            max_attempts = breakers.get("max_attempts", 3)
+            phase_key = str(phase["id"])
+            attempts = self.state["attempt_counts"].get(phase_key, 0)
+            error_feedback = None
+
+            while attempts < max_attempts:
+                attempts += 1
+                self.state["attempt_counts"][phase_key] = attempts
+                self.save_state()
+
+                log_progress(
+                    phase_name,
+                    "🚀",
+                    f"Dispatching worker {actor} (Attempt {attempts}/{max_attempts})...",
+                    Colors.YELLOW,
+                )
+
+                # Dispatch worker
+                try:
+                    asyncio.run(self.dispatch_phase_worker(phase, error_feedback=error_feedback))
+                except Exception as e:
+                    log_progress(phase_name, "❌", f"Worker execution error: {e}", Colors.RED)
+                    error_feedback = f"Worker runtime exception: {e}"
+
+                # Check Circuit Breakers
+                circuit_tripped = False
+                try:
+                    self.check_forbidden_paths(phase_name, breakers.get("forbidden_paths", []))
+                    self.check_blast_radius(phase_name, breakers.get("max_diff_lines", 250))
+                except CircuitBreakerException as cb_err:
+                    circuit_tripped = True
+                    log_progress(phase_name, "🛑", f"Circuit Breaker Tripped! {cb_err}", Colors.RED)
+                    # Revert modifications to prevent bad state from compounding
+                    subprocess.run(["git", "restore", "."], cwd=self.work_dir)
+                    error_feedback = (
+                        f"CIRCUIT BREAKER VIOLATION: {cb_err}\n"
+                        f"You touched forbidden paths or exceeded diff lines. Reverted changes."
+                    )
+
+                if circuit_tripped:
+                    if attempts >= max_attempts:
+                        break
+                    continue
+
+                # Evaluate Gate
+                log_progress(phase_name, "🔍", "Evaluating physical receipt gates...")
+                passed, evidence = self.evaluate_gate(phase)
+
+                if passed:
+                    log_progress(phase_name, "✅", f"Gate verified! {evidence}", Colors.GREEN)
+                    self.state["completed_phases"].append(phase["id"])
+                    self.state["attempt_counts"][phase_key] = 0
+                    self.state["current_phase_idx"] = idx + 1
+                    self.save_state()
+
+                    # Commit milestone if git repo is dirty
+                    status_res = subprocess.run(
+                        ["git", "status", "--porcelain"],
+                        cwd=self.work_dir,
+                        capture_output=True,
+                        text=True,
+                    )
+                    if status_res.stdout.strip():
+                        subprocess.run(["git", "add", "-A"], cwd=self.work_dir)
+                        subprocess.run(
+                            [
+                                "git",
+                                "commit",
+                                "-m",
+                                f"KEEPER: Phase {phase['id']} ({phase['name']}) verified",
+                            ],
+                            cwd=self.work_dir,
+                        )
+                        log_progress(phase_name, "📦", f"Committed verified milestone for Phase {phase['id']}.")
+
+                    if target_phase_id is not None:
+                        return True
+                    break
+                else:
+                    log_progress(
+                        phase_name,
+                        "⚠️",
+                        f"Gate check failed (Attempt {attempts}/{max_attempts}): {evidence.splitlines()[0]}",
+                        Colors.YELLOW,
+                    )
+                    error_feedback = evidence
+
+            # If loop finished without passing
+            if self.state["attempt_counts"].get(phase_key, 0) >= max_attempts:
+                self.state["status"] = "HALTED"
+                self.state["last_halt_reason"] = f"Strike {max_attempts} reached on {phase_name}"
+                self.save_state()
+                print_dossier(
+                    phase_id=phase["id"],
+                    phase_name=phase["name"],
+                    actor=actor,
+                    gate_status=f"STRIKE {max_attempts} (RETRY LIMIT EXCEEDED)",
+                    evidence=error_feedback or "Unknown error",
+                    action_required=f"HALT: Subagent failed {max_attempts} consecutive attempts. Overgod intervention required.",
+                    is_halt=True,
+                )
+                return False
+
     def print_status(self):
         """Prints the current state and execution graph."""
         idx = self.state["current_phase_idx"]
         status = self.state["status"]
-        print(f"\n{Colors.BOLD}Project KEEPER Operational Status:{Colors.RESET}")
+        mode_label = "The Inspection (Audit & Health Check)" if self.workflow == "audit" else "The Forge (Feature & Defect)"
+        print(f"\n{Colors.BOLD}Project KEEPER Operational Status [{mode_label}]:{Colors.RESET}")
         print(f"Status: {status} | Progress: {idx}/{len(self.phases)} phases completed\n")
 
         for i, p in enumerate(self.phases):
@@ -424,7 +757,7 @@ class KeeperRunner:
             else:
                 mark = "  [PENDING]  "
 
-            print(f"  {mark} Phase {p_id:4}: {name:<32} ({actor:<22} | {inter})")
+            print(f"  {mark} Phase {p_id:>12}: {name:<36} ({actor:<22} | {inter})")
 
         if self.state.get("last_halt_reason"):
             print(f"\n{Colors.RED}Last Halt Reason: {self.state['last_halt_reason']}{Colors.RESET}")
@@ -432,16 +765,26 @@ class KeeperRunner:
 
 
 def main():
+    # If running directly from CLI and not in venv, auto-reexec inside venv if present
+    script_dir = Path(__file__).resolve().parent
+    venv_python = script_dir / "venv" / "bin" / "python3"
+    if not ANTIGRAVITY_AVAILABLE and venv_python.exists() and sys.executable != str(venv_python):
+        os.execv(str(venv_python), [str(venv_python)] + sys.argv)
+
     parser = argparse.ArgumentParser(description="Project KEEPER Deterministic State Machine Runner")
     parser.add_argument("--config", default="keeper.yaml", help="Path to keeper.yaml")
     parser.add_argument("--status", action="store_true", help="Print current status and exit")
-    parser.add_argument("--reset", action="store_true", help="Reset state machine to Phase 1")
+    parser.add_argument("--reset", action="store_true", help="Reset state machine to initial phase")
     parser.add_argument("--dry-run", action="store_true", help="Validate workflow graph and exit")
     parser.add_argument("--approve", action="store_true", help="Approve current interactive checkpoint and advance")
+    parser.add_argument("--drive", action="store_true", help="Autonomously drive phases using Antigravity SDK")
+    parser.add_argument("--phase", type=str, default=None, help="Execute autonomous driver specifically for a given phase ID")
+    parser.add_argument("--audit", action="store_true", help="Run the automated Inspection / General Health Audit gauntlet")
     args = parser.parse_args()
 
+    workflow = "audit" if args.audit else "feature"
     try:
-        runner = KeeperRunner(config_path=args.config)
+        runner = KeeperRunner(config_path=args.config, workflow=workflow)
     except FileNotFoundError as e:
         print(f"{Colors.RED}Error: {e}{Colors.RESET}")
         sys.exit(1)
@@ -469,7 +812,14 @@ def main():
             runner.state["status"] = "RUNNING"
             runner.state["last_halt_reason"] = None
             runner.save_state()
-            runner.run_step(auto_advance=True)
+            if args.drive:
+                runner.run_drive()
+            else:
+                runner.run_step(auto_advance=True)
+        return
+
+    if args.drive or args.phase is not None:
+        runner.run_drive(target_phase_id=args.phase)
         return
 
     runner.run_step(auto_advance=True)
