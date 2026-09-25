@@ -650,6 +650,16 @@ class KeeperRunner:
         except CircuitBreakerException as e:
             return False, f"Circuit breaker tripped: {e}"
 
+        if str(phase_id) == "10":
+            try:
+                sys.path.insert(0, str(self.work_dir))
+                from traps.triplet_gate import check_triplet
+                ok, msg = check_triplet(str(self.work_dir))
+                if not ok:
+                    return False, msg
+            except Exception as e:
+                return False, f"Triplet gate execution failed: {e}"
+
         # 2. Check requires dependencies
         requires_patterns = phase.get("requires", [])
         for pat in requires_patterns:

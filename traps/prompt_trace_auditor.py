@@ -112,8 +112,8 @@ def _classify_directive(raw_text: str, file_path: Path) -> Dict[str, Any]:
     if "Mechanical Git Triplet" in clean or ("atomically modify:" in clean and "INVARIANTS.md" in clean):
         return {
             "text": text,
-            "category": "ACTIONABLE_TRACE_CANDIDATE",
-            "recommended_trace": "Git commit/diff check verifying bugfix commits atomically touch src/**, tests/**, and INVARIANTS.md.",
+            "category": "ENFORCED_TRACE",
+            "current_mechanism": "triplet_gate.py script integrated into Phase 10 validation.",
         }
 
     # 6. Quartermaster zero-allocation hot paths and spans
