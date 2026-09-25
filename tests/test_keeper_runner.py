@@ -485,6 +485,180 @@ class TestKeeperRunner(unittest.TestCase):
         )
         self.assertEqual(rc, 1, "Uncompilable mutants must be STILLBORN, not counted as KILLED")
 
+    def test_protocol_violations_recorded_and_persisted_across_retries(self):
+        """Proves that circuit breaker violations are recorded in protocol_violations and survive retry recovery."""
+        import io
+        import subprocess
+        from contextlib import redirect_stdout
+        from keeper_runner import print_dossier
+
+        subprocess.run(["git", "init"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@keeper.local"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Keeper Test"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "add", "keeper.yaml"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=self.work_dir, capture_output=True, check=True)
+
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        self.assertIn("protocol_violations", runner.state)
+        self.assertEqual(runner.state["protocol_violations"], [])
+
+        runner.state["current_phase_idx"] = 1  # Phase 2 (The Trapsmith, forbids src/**)
+        rogue_file = self.work_dir / "src" / "rogue.cpp"
+
+        call_count = 0
+        async def fake_worker(phase, error_feedback=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                rogue_file.parent.mkdir(parents=True, exist_ok=True)
+                rogue_file.write_text("// illegal modification\n", encoding="utf-8")
+            return True
+
+        with patch.object(runner, "dispatch_phase_worker", side_effect=fake_worker), \
+             patch.object(runner, "evaluate_gate", return_value=(True, "Gate A passed")):
+            res = runner.run_drive(target_phase_id=2)
+            self.assertTrue(res, "Attempt 2 should recover and pass Gate A")
+
+        violations = runner.state.get("protocol_violations", [])
+        self.assertEqual(len(violations), 1, "Violation from Attempt 1 must be retained after Attempt 2 succeeds")
+        self.assertEqual(str(violations[0]["phase_id"]), "2")
+        self.assertEqual(violations[0]["actor"], "The Trapsmith")
+        self.assertEqual(violations[0]["attempt"], 1)
+        self.assertIn("src/rogue.cpp", violations[0]["detail"])
+
+        # Verify persistence across state reload
+        reloaded = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        self.assertEqual(len(reloaded.state.get("protocol_violations", [])), 1)
+
+        # Verify print_status outputs PROTOCOL VIOLATION LEDGER
+        status_buf = io.StringIO()
+        with redirect_stdout(status_buf):
+            reloaded.print_status()
+        status_out = status_buf.getvalue()
+        self.assertIn("PROTOCOL VIOLATION LEDGER", status_out)
+        self.assertIn("src/rogue.cpp", status_out)
+
+        # Verify print_dossier outputs PROTOCOL VIOLATION LEDGER when violations are passed
+        dossier_buf = io.StringIO()
+        with redirect_stdout(dossier_buf):
+            print_dossier(
+                phase_id=2,
+                phase_name="Phase 2",
+                actor="The Trapsmith",
+                gate_status="READY",
+                evidence="Verified",
+                action_required="Review",
+                is_halt=False,
+                violations=violations,
+            )
+        self.assertIn("PROTOCOL VIOLATION LEDGER", dossier_buf.getvalue())
+
+    def test_materialize_phase_prompt_writes_disk_artifact_and_sha256(self):
+        """Proves materialize_phase_prompt writes deterministic disk prompt files and records SHA-256."""
+        import hashlib
+
+        codex_prompts = self.work_dir / "codex" / "prompts"
+        codex_prompts.mkdir(parents=True, exist_ok=True)
+        role_prompt_file = codex_prompts / "trapsmith_system.md"
+        role_prompt_file.write_text("# Role: The Trapsmith\nWrite hostile tests.\n", encoding="utf-8")
+
+        keeper_dir = self.work_dir / ".keeper"
+        keeper_dir.mkdir(parents=True, exist_ok=True)
+        active_task_file = keeper_dir / "active_task.md"
+        active_task_file.write_text("# Active Task\nTest specification.\n", encoding="utf-8")
+
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        phase = dict(runner.phases[1])
+        phase["system_prompt"] = "codex/prompts/trapsmith_system.md"
+        phase["requires"] = ["include/*.h"]
+        phase["produces"] = ["tests/*.cpp"]
+
+        prompt_path, content = runner.materialize_phase_prompt(
+            phase, error_feedback="Assertion failed at line 42"
+        )
+
+        self.assertTrue(prompt_path.exists(), "Phase prompt artifact must be written to .keeper/prompts/")
+        self.assertEqual(prompt_path.parent, self.work_dir / ".keeper" / "prompts")
+        self.assertTrue(prompt_path.name.startswith("phase_2_"))
+        self.assertIn("trapsmith", prompt_path.name)
+
+        active_phase_prompt = self.work_dir / ".keeper" / "active_phase_prompt.md"
+        self.assertTrue(active_phase_prompt.exists(), ".keeper/active_phase_prompt.md must be written")
+        self.assertEqual(prompt_path.read_text(encoding="utf-8"), content)
+        self.assertEqual(active_phase_prompt.read_text(encoding="utf-8"), content)
+
+        # Verify content includes role constitution reference, task spec reference, and error feedback
+        self.assertIn("trapsmith_system.md", content)
+        self.assertIn("active_task.md", content)
+        self.assertIn("Assertion failed at line 42", content)
+
+        # Verify SHA-256 recorded in state
+        expected_sha = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        last_prompt = runner.state.get("last_dispatched_prompt")
+        self.assertIsNotNone(last_prompt)
+        self.assertEqual(str(last_prompt["phase_id"]), "2")
+        self.assertEqual(last_prompt["actor"], "The Trapsmith")
+        self.assertEqual(last_prompt["sha256"], expected_sha)
+
+    def test_check_code_traces_catches_disallowed_constructs_and_unmarked_todos(self):
+        """Proves check_code_traces catches banned constructs, unmarked TODOs, header loops, and test skips."""
+        import subprocess
+
+        subprocess.run(["git", "init"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@keeper.local"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Keeper Test"], cwd=self.work_dir, capture_output=True, check=True)
+
+        src_file = self.work_dir / "src" / "foo.cpp"
+        inc_file = self.work_dir / "include" / "foo.h"
+        tst_file = self.work_dir / "tests" / "foo.cpp"
+        src_file.parent.mkdir(parents=True, exist_ok=True)
+        inc_file.parent.mkdir(parents=True, exist_ok=True)
+        tst_file.parent.mkdir(parents=True, exist_ok=True)
+
+        src_file.write_text("int compute(int x) {\n    return x + 1;\n}\n", encoding="utf-8")
+        inc_file.write_text("#pragma once\nstruct Foo { int x; };\n", encoding="utf-8")
+        tst_file.write_text("void test_foo() {}\n", encoding="utf-8")
+
+        subprocess.run(["git", "add", "."], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "baseline"], cwd=self.work_dir, capture_output=True, check=True)
+
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+
+        # 1. Disallowed reinterpret_cast in src/foo.cpp
+        src_file.write_text("int compute(int x) {\n    auto* p = reinterpret_cast<char*>(&x);\n    return *p;\n}\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("reinterpret_cast", str(ctx.exception))
+
+        # 2. Disallowed #pragma in src/foo.cpp
+        src_file.write_text("#pragma pack(push, 1)\nint compute(int x) {\n    return x;\n}\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("#pragma", str(ctx.exception))
+
+        # 3. Unmarked // TODO: fix in src/foo.cpp
+        src_file.write_text("int compute(int x) {\n    // TODO: fix later\n    return x;\n}\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("TODO", str(ctx.exception))
+
+        # 4. Valid // TODO(KEEPER-DEBT: INV-1): details in src/foo.cpp -> MUST PASS
+        src_file.write_text("int compute(int x) {\n    // TODO(KEEPER-DEBT: INV-1): Multi-dimensional space deferred\n    return x;\n}\n", encoding="utf-8")
+        runner.check_code_traces("Phase 6")
+
+        # 5. Algorithmic while ( loop in include/foo.h -> MUST RAISE
+        inc_file.write_text("#pragma once\nstruct Foo {\n    void run() { while (true) {} }\n};\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("while (", str(ctx.exception))
+        inc_file.write_text("#pragma once\nstruct Foo { int x; };\n", encoding="utf-8")
+
+        # 6. GTEST_SKIP in tests/foo.cpp -> MUST RAISE
+        tst_file.write_text("void test_foo() {\n    GTEST_SKIP() << \"skipping\";\n}\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("GTEST_SKIP", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

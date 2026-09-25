@@ -307,7 +307,20 @@ else
     cp -r "${SCRIPT_DIR}/.agents/skills/"* "${SKILLS_DEST}/"
 fi
 
-# 10. Configure Local Git Exclude (.git/info/exclude) for External Repositories
+# 10. Deploy Lifecycle Hooks Configuration (.agents/hooks.json)
+HOOKS_DEST="${TARGET_DIR}/.agents/hooks.json"
+mkdir -p "$(dirname "${HOOKS_DEST}")"
+if [ -f "${SCRIPT_DIR}/.agents/hooks.json" ]; then
+    if [ "${USE_LINK}" = true ]; then
+        echo "==> Symlinking Lifecycle Hooks (${SCRIPT_DIR}/.agents/hooks.json -> .agents/hooks.json)..."
+        ln -sf "${SCRIPT_DIR}/.agents/hooks.json" "${HOOKS_DEST}"
+    else
+        echo "==> Copying Lifecycle Hooks (${SCRIPT_DIR}/.agents/hooks.json -> .agents/hooks.json)..."
+        cp "${SCRIPT_DIR}/.agents/hooks.json" "${HOOKS_DEST}"
+    fi
+fi
+
+# 11. Configure Local Git Exclude (.git/info/exclude) for External Repositories
 if [ "${TARGET_DIR}" != "${SCRIPT_DIR}" ] && git -C "${TARGET_DIR}" rev-parse --git-dir >/dev/null 2>&1; then
     GIT_COMMON_DIR="$(cd "${TARGET_DIR}" && cd "$(git rev-parse --git-common-dir)" && pwd)"
     GIT_PREFIX="$(git -C "${TARGET_DIR}" rev-parse --show-prefix)"

@@ -11,6 +11,7 @@ import argparse
 import asyncio
 import fnmatch
 import glob
+import hashlib
 import json
 import os
 import re
@@ -57,6 +58,7 @@ def print_dossier(
     evidence: str,
     action_required: str,
     is_halt: bool = False,
+    violations: Optional[List[Dict[str, Any]]] = None,
 ):
     """Prints a standardized, human-readable KEEPER Gate Dossier."""
     color = Colors.RED if is_halt else Colors.YELLOW
@@ -68,6 +70,15 @@ def print_dossier(
     print(f"  👤 Actor:           {actor}")
     print(f"  🧪 Gate Status:     {gate_status}")
     print(f"  📦 Evidence:        {evidence}")
+    if violations:
+        print(f"  ------------------------------------------------------------------")
+        print(f"  🚨 PROTOCOL VIOLATION LEDGER ({len(violations)} breached containment):")
+        for v in violations:
+            p_id = v.get("phase_id", "?")
+            act = v.get("actor", "Unknown")
+            det = v.get("detail", "")
+            att = v.get("attempt", 1)
+            print(f"    - [Phase {p_id} | {act} | Att {att}]: {det}")
     print(f"  ------------------------------------------------------------------")
     print(f"  👁️  Overgod Action:  {action_required}")
     print(f"{color}{sep}{Colors.RESET}\n")
@@ -231,6 +242,8 @@ class KeeperRunner:
                     s = json.load(f)
                     if "last_build_failed" not in s:
                         s["last_build_failed"] = False
+                    if "protocol_violations" not in s:
+                        s["protocol_violations"] = []
                     return s
             except Exception:
                 pass
@@ -242,7 +255,29 @@ class KeeperRunner:
             "status": "RUNNING",
             "last_halt_reason": None,
             "last_build_failed": False,
+            "protocol_violations": [],
         }
+
+    def record_violation(
+        self,
+        phase_id: Any,
+        actor: str,
+        violation_type: str,
+        detail: str,
+        attempt: int = 1,
+    ) -> None:
+        """Records a containment or protocol violation to the persistent ledger."""
+        if "protocol_violations" not in self.state:
+            self.state["protocol_violations"] = []
+        entry = {
+            "phase_id": phase_id,
+            "actor": actor,
+            "type": violation_type,
+            "detail": detail,
+            "attempt": attempt,
+        }
+        self.state["protocol_violations"].append(entry)
+        self.save_state()
 
     def save_state(self):
         """Persists state to configured state file."""
@@ -327,6 +362,7 @@ class KeeperRunner:
             "status": "RUNNING",
             "last_halt_reason": None,
             "last_build_failed": False,
+            "protocol_violations": [],
         }
         self.save_state()
         mode_label = "Audit workflow" if self.workflow == "audit" else "State machine"
@@ -403,6 +439,80 @@ class KeeperRunner:
                         raise CircuitBreakerException(
                             f"Scope Guard Violation! Subagent touched forbidden path: {file_path} (Matches pattern: {pat})"
                         )
+        except subprocess.CalledProcessError:
+            pass
+
+    def check_code_traces(self, phase_name: str) -> None:
+        """
+        Inspects added lines from git diff for disallowed constructs, unmarked TODOs,
+        header loops, and forbidden test skips.
+        """
+        try:
+            diff_res = subprocess.run(
+                ["git", "diff", "HEAD"],
+                cwd=self.work_dir,
+                capture_output=True,
+                text=True,
+            )
+            diff_text = diff_res.stdout
+            if diff_res.returncode != 0:
+                diff_res2 = subprocess.run(
+                    ["git", "diff"],
+                    cwd=self.work_dir,
+                    capture_output=True,
+                    text=True,
+                )
+                diff_text = diff_res2.stdout
+
+            current_file = ""
+            disallowed_constructs = [
+                "#pragma",
+                "reinterpret_cast",
+                "goto",
+                "malloc(",
+                "free(",
+            ]
+
+            for line in diff_text.splitlines():
+                if line.startswith("+++ b/"):
+                    current_file = line[6:].strip()
+                    continue
+                if not line.startswith("+") or line.startswith("+++"):
+                    continue
+
+                added = line[1:].strip()
+
+                if current_file.startswith("src/"):
+                    for construct in disallowed_constructs:
+                        if construct in added:
+                            raise CircuitBreakerException(
+                                f"Executable Trace Violation: Disallowed construct '{construct}' in {current_file}: '{added}'"
+                            )
+                    if ("// TODO" in added or "/* TODO" in added) and "TODO(KEEPER-DEBT:" not in added:
+                        raise CircuitBreakerException(
+                            f"Executable Trace Violation: Unmarked TODO in {current_file}: '{added}'"
+                        )
+
+                elif current_file.startswith("include/"):
+                    if "for (" in added or "while (" in added:
+                        raise CircuitBreakerException(
+                            f"Executable Trace Violation: Algorithmic loop in header {current_file}: '{added}'"
+                        )
+                    if ("// TODO" in added or "/* TODO" in added) and "TODO(KEEPER-DEBT:" not in added:
+                        raise CircuitBreakerException(
+                            f"Executable Trace Violation: Unmarked TODO in {current_file}: '{added}'"
+                        )
+
+                elif current_file.startswith("tests/") and current_file.endswith((".cpp", ".cc", ".cxx", ".h", ".hpp")):
+                    if "SKIP_IF" in added or "GTEST_SKIP" in added:
+                        raise CircuitBreakerException(
+                            f"Executable Trace Violation: Forbidden test bypass '{added}' in {current_file}"
+                        )
+                    if "#define private public" in added:
+                        raise CircuitBreakerException(
+                            f"Executable Trace Violation: Forbidden test bypass '#define private public' in {current_file}"
+                        )
+
         except subprocess.CalledProcessError:
             pass
 
@@ -536,6 +646,7 @@ class KeeperRunner:
         try:
             self.check_forbidden_paths(phase_name, breakers.get("forbidden_paths", []))
             self.check_blast_radius(phase_name, breakers.get("max_diff_lines", 250))
+            self.check_code_traces(phase_name)
         except CircuitBreakerException as e:
             return False, f"Circuit breaker tripped: {e}"
 
@@ -636,7 +747,15 @@ class KeeperRunner:
         try:
             self.check_forbidden_paths(phase_name, breakers.get("forbidden_paths", []))
             self.check_blast_radius(phase_name, breakers.get("max_diff_lines", 250))
+            self.check_code_traces(phase_name)
         except CircuitBreakerException as e:
+            self.record_violation(
+                phase_id=phase_id,
+                actor=actor,
+                violation_type="CircuitBreakerException",
+                detail=str(e),
+                attempt=1,
+            )
             self.state["status"] = "HALTED"
             self.state["last_halt_reason"] = str(e)
             self.save_state()
@@ -648,6 +767,7 @@ class KeeperRunner:
                 evidence=str(e),
                 action_required="HALT: Architectural violation. Inspect tree and resolve before proceeding.",
                 is_halt=True,
+                violations=self.state.get("protocol_violations"),
             )
             return False
 
@@ -723,24 +843,22 @@ class KeeperRunner:
 
         return True
 
-    async def dispatch_phase_worker(
+    def materialize_phase_prompt(
         self, phase: Dict[str, Any], error_feedback: Optional[str] = None
-    ) -> bool:
+    ) -> Tuple[Path, str]:
         """
-        Dispatches an autonomous Antigravity subagent strictly scoped to this phase.
-        Loads the specific role system prompt (e.g. trapsmith_system.md) and task prompt.
+        Materializes a disk-grounded prompt packet for the subagent phase.
+        Writes to .keeper/prompts/phase_<id>_<actor_slug>.md and .keeper/active_phase_prompt.md.
+        Records SHA-256 hash in state.
         """
-        if not ANTIGRAVITY_AVAILABLE:
-            raise RuntimeError(
-                "Antigravity SDK (google-antigravity) is not installed in the environment."
-            )
-
         phase_id = phase["id"]
         phase_name = phase["name"]
         actor = phase.get("actor", "Subagent")
+        actor_slug = re.sub(r"[^a-zA-Z0-9_]+", "_", actor.lower()).strip("_")
 
         # 1. Resolve system prompt
         sys_prompt_file = phase.get("system_prompt")
+        system_prompt_path_str = ""
         system_instructions = ""
         if sys_prompt_file:
             candidates = [
@@ -751,22 +869,31 @@ class KeeperRunner:
             for c in candidates:
                 if c.exists():
                     system_instructions = c.read_text(encoding="utf-8")
+                    system_prompt_path_str = str(c.relative_to(self.work_dir) if c.is_relative_to(self.work_dir) else c)
                     break
 
-        if not system_instructions:
-            system_instructions = (
-                f"You are {actor} in Project KEEPER. You must strictly execute your designated phase mandate."
-            )
+        if not system_prompt_path_str and sys_prompt_file:
+            system_prompt_path_str = str(sys_prompt_file)
 
-        # 2. Construct constrained task prompt
+        # 2. Build task prompt packet
         prompt_parts = [
             f"# Project KEEPER: Phase {phase_id} ({phase_name})",
             f"**Assigned Actor**: {actor}",
             f"**Workspace**: `{self.work_dir}`",
         ]
 
+        if system_prompt_path_str:
+            prompt_parts.append(f"**Role Constitution File**: `{system_prompt_path_str}`")
+
+        active_task_path = self.work_dir / ".keeper" / "active_task.md"
+        if active_task_path.exists():
+            prompt_parts.append(f"**Task Specification**: `.keeper/active_task.md`")
+
         if phase.get("prompt"):
             prompt_parts.append(f"**Directive**: {phase['prompt']}")
+
+        if phase.get("requires"):
+            prompt_parts.append(f"**Input Dependencies**: {', '.join(phase['requires'])}")
 
         if phase.get("produces"):
             prompt_parts.append(f"**Target Outputs**: {', '.join(phase['produces'])}")
@@ -804,6 +931,70 @@ class KeeperRunner:
             )
 
         task_prompt = "\n\n".join(prompt_parts)
+
+        # 3. Write disk artifacts
+        prompts_dir = self.work_dir / ".keeper" / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        phase_prompt_path = prompts_dir / f"phase_{phase_id}_{actor_slug}.md"
+        phase_prompt_path.write_text(task_prompt, encoding="utf-8")
+
+        active_phase_prompt_path = self.work_dir / ".keeper" / "active_phase_prompt.md"
+        active_phase_prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        active_phase_prompt_path.write_text(task_prompt, encoding="utf-8")
+
+        # 4. Compute SHA-256 and save in state
+        sha256_hash = hashlib.sha256(task_prompt.encode("utf-8")).hexdigest()
+        try:
+            rel_path_str = str(phase_prompt_path.relative_to(self.work_dir))
+        except ValueError:
+            rel_path_str = str(phase_prompt_path)
+
+        self.state["last_dispatched_prompt"] = {
+            "phase_id": phase_id,
+            "actor": actor,
+            "prompt_path": rel_path_str,
+            "sha256": sha256_hash,
+        }
+        self.save_state()
+
+        return phase_prompt_path, task_prompt
+
+    async def dispatch_phase_worker(
+        self, phase: Dict[str, Any], error_feedback: Optional[str] = None
+    ) -> bool:
+        """
+        Dispatches an autonomous Antigravity subagent strictly scoped to this phase.
+        Loads the specific role system prompt (e.g. trapsmith_system.md) and task prompt.
+        """
+        if not ANTIGRAVITY_AVAILABLE:
+            raise RuntimeError(
+                "Antigravity SDK (google-antigravity) is not installed in the environment."
+            )
+
+        phase_id = phase["id"]
+        actor = phase.get("actor", "Subagent")
+
+        # Materialize prompt on disk
+        prompt_path, task_prompt = self.materialize_phase_prompt(phase, error_feedback=error_feedback)
+
+        # Resolve system instructions
+        sys_prompt_file = phase.get("system_prompt")
+        system_instructions = ""
+        if sys_prompt_file:
+            candidates = [
+                self.work_dir / sys_prompt_file,
+                self.work_dir / "codex" / "prompts" / Path(sys_prompt_file).name,
+                self.work_dir / ".antigravity" / "prompts" / Path(sys_prompt_file).name,
+            ]
+            for c in candidates:
+                if c.exists():
+                    system_instructions = c.read_text(encoding="utf-8")
+                    break
+
+        if not system_instructions:
+            system_instructions = (
+                f"You are {actor} in Project KEEPER. You must strictly execute your designated phase mandate."
+            )
 
         log_progress(f"Phase {phase_id}", "🤖", f"Spawning {actor} via Antigravity SDK...")
 
@@ -930,8 +1121,16 @@ class KeeperRunner:
                 try:
                     self.check_forbidden_paths(phase_name, breakers.get("forbidden_paths", []))
                     self.check_blast_radius(phase_name, breakers.get("max_diff_lines", 250))
+                    self.check_code_traces(phase_name)
                 except CircuitBreakerException as cb_err:
                     circuit_tripped = True
+                    self.record_violation(
+                        phase_id=phase["id"],
+                        actor=actor,
+                        violation_type="CircuitBreakerException",
+                        detail=str(cb_err),
+                        attempt=attempts,
+                    )
                     log_progress(phase_name, "🛑", f"Circuit Breaker Tripped! {cb_err}", Colors.RED)
                     # Revert tracked, staged, and untracked modifications to prevent bad state from compounding
                     self._rollback_working_tree(pre_head)
@@ -1029,6 +1228,16 @@ class KeeperRunner:
 
         if self.state.get("last_halt_reason"):
             print(f"\n{Colors.RED}Last Halt Reason: {self.state['last_halt_reason']}{Colors.RESET}")
+
+        violations = self.state.get("protocol_violations", [])
+        if violations:
+            print(f"\n{Colors.RED}🚨 PROTOCOL VIOLATION LEDGER ({len(violations)} breached containment):{Colors.RESET}")
+            for v in violations:
+                p_id = v.get("phase_id", "?")
+                act = v.get("actor", "Unknown")
+                det = v.get("detail", "")
+                att = v.get("attempt", 1)
+                print(f"  - [Phase {p_id} | {act} | Att {att}]: {det}")
         print()
 
 
@@ -1051,7 +1260,19 @@ def main():
     parser.add_argument("--milestone", action="store_true", help="Activate milestone-only conditional phases (e.g. Phase 8.6 The Censor)")
     parser.add_argument("--defect-escape", action="store_true", help="Activate post-mortem defect inquest phases (e.g. Phase 11 The Coroner)")
     parser.add_argument("--strict", action="store_true", help="Enforce strict verification gates without fallback")
+    parser.add_argument("--audit-prompts", action="store_true", help="Audit subagent prompts and codex for executable trace compliance")
     args = parser.parse_args()
+
+    if args.audit_prompts:
+        from traps.prompt_trace_auditor import audit_repository_prompts, format_markdown_report
+        work_dir = Path(".").resolve()
+        report = audit_repository_prompts(work_dir)
+        md_text = format_markdown_report(report)
+        print(md_text)
+        out_json = work_dir / ".keeper" / "prompt_trace_report.json"
+        out_json.parent.mkdir(parents=True, exist_ok=True)
+        out_json.write_text(json.dumps(report, indent=2), encoding="utf-8")
+        sys.exit(0)
 
     workflow = "audit" if args.audit else "feature"
     try:

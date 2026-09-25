@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 VALID_DEBT_PATTERN = re.compile(r"TODO\(KEEPER-DEBT:\s*([^)]+)\):\s*(.+)")
-GENERIC_TODO_PATTERN = re.compile(r"(?:\bTODO\b|\bFIXME\b)(?!\(KEEPER-DEBT)")
+GENERIC_TODO_PATTERN = re.compile(r"^\s*(?://|#|/\*)\s*(?:TODO|FIXME)\b(?!\(KEEPER-DEBT)", re.IGNORECASE)
 
 EXCLUDE_DIRS = {
     ".git",

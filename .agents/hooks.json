@@ -1,0 +1,35 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f ../traps/keeper_hook.py ]; then exec python3 ../traps/keeper_hook.py --event pre_tool_use; else exec python3 traps/keeper_hook.py --event pre_tool_use; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -f ../traps/keeper_hook.py ]; then exec python3 ../traps/keeper_hook.py --event post_tool_use; else exec python3 traps/keeper_hook.py --event post_tool_use; fi",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "type": "command",
+        "command": "if [ -f ../traps/keeper_hook.py ]; then exec python3 ../traps/keeper_hook.py --event stop; else exec python3 traps/keeper_hook.py --event stop; fi",
+        "timeout": 10
+      }
+    ]
+  }
+}
