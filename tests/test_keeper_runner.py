@@ -422,10 +422,69 @@ class TestKeeperRunner(unittest.TestCase):
             )
             self.assertEqual(exit_code, 1)
 
+    def test_gate_a_rejects_command_not_found(self):
+        """Proves Gate A rejects shell invocation errors (exit 126/127) instead of certifying them as caught defects."""
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        broken_cmd_gate = {
+            "type": "gate_a",
+            "build_command": "true",
+            "run_command": "nonexistent_binary_xyz_12345",
+            "expected_exit_code": 1,
+        }
+        passed, msg = runner.evaluate_gate({"id": 4, "name": "Gate A", "gate": broken_cmd_gate})
+        self.assertFalse(passed, f"Gate A must reject exit code 127, but got passed=True ({msg})")
+        self.assertIn("127", msg)
+
+    def test_circuit_breaker_cleans_untracked_files(self):
+        """Proves that when a worker creates an untracked file in a forbidden path, rollback removes it."""
+        # Initialize a real git repo in self.work_dir
+        import subprocess
+        subprocess.run(["git", "init"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@keeper.local"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Keeper Test"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "add", "keeper.yaml"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=self.work_dir, capture_output=True, check=True)
+
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(self.work_dir))
+        runner.state["current_phase_idx"] = 1  # Phase 2 forbids src/**
+
+        rogue_file = self.work_dir / "src" / "rogue_untracked.cpp"
+
+        call_count = 0
+        async def fake_worker(phase, error_feedback=None):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                # Attempt 1: create an untracked file in forbidden src/
+                rogue_file.parent.mkdir(parents=True, exist_ok=True)
+                rogue_file.write_text("// rogue file\n", encoding="utf-8")
+            return True
+
+        with patch.object(runner, "dispatch_phase_worker", side_effect=fake_worker), \
+             patch.object(runner, "evaluate_gate", return_value=(True, "Gate A passed")):
+            res = runner.run_drive(target_phase_id=2)
+            self.assertTrue(res, "Attempt 2 should succeed after untracked rogue file is cleaned up")
+            self.assertFalse(rogue_file.exists(), "Untracked rogue file in forbidden path must be deleted on rollback")
+
+    def test_mutation_engine_stillborn_on_compile_failure(self):
+        """Proves that uncompilable mutants are marked STILLBORN and excluded from killed_count."""
+        from traps.mutation_gate import run_mutation_engine
+
+        test_cpp = self.work_dir / "src" / "sample.cpp"
+        test_cpp.parent.mkdir(parents=True, exist_ok=True)
+        test_cpp.write_text("bool check(int a, int b) {\n    return a == b;\n}\n", encoding="utf-8")
+
+        # Build fails (exit 1), meaning all mutants fail to compile -> STILLBORN, not KILLED.
+        # Under strict=True, if 0 mutants are actually evaluated by tests, it should fail (return 1).
+        rc = run_mutation_engine(
+            stage="gate_b",
+            work_dir=self.work_dir,
+            build_cmd="false",
+            test_cmd="true",
+            strict=True,
+        )
+        self.assertEqual(rc, 1, "Uncompilable mutants must be STILLBORN, not counted as KILLED")
+
 
 if __name__ == "__main__":
     unittest.main()
-
-
-
-

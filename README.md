@@ -89,6 +89,8 @@ By strictly applying the **Subsystem Isolation Pattern**, `tools/text_editor` op
 ├── README.md                                     # Project overview, adoption guide, directory map
 ├── AGENTS.md                                     # Tier 1 Master Constitution (Symlink to codex/AGENTS.md)
 ├── init_keeper.sh                                # 1-command automated project bootstrapper
+├── keeper_runner.py                              # Deterministic neuro-symbolic workflow runner
+├── keeper                                        # CLI entry-point symlink (-> keeper_runner.py)
 │
 ├── .agents/                                      # Antigravity Workspace Customizations
 │   └── skills/                                   # On-demand operational runbooks
@@ -100,24 +102,29 @@ By strictly applying the **Subsystem Isolation Pattern**, `tools/text_editor` op
 ├── codex/                                        # Canonical Distribution Hub
 │   ├── AGENTS.md                                 # Tier 1 Master Constitution
 │   ├── TEXT_DOMAIN.md                            # Tier 2 Universal Text Domain Codex
-│   ├── prompts/                                  # Canonical Subagent System Prompts (13 roles)
+│   ├── keeper.yaml                               # Declarative workflow & circuit breaker spec
+│   ├── prompts/                                  # Canonical Subagent System Prompts (14 roles)
 │   └── archive/                                  # Historical playbooks & artifacts
 │
-├── docs/                                         # Architectural Documentation & RFCs
+├── docs/                                         # Architectural Documentation
 │   ├── BUILD_ADAPTERS.md                         # Wiring GN, CMake, Cargo, Bazel into Gauntlet
-│   ├── architecture/
-│   │   └── zero_trust_cpp_gauntlet_architecture.md # Foundational Gauntlet Whitepaper
-│   └── rfcs/                                     # Architectural Proposals (RFCs)
+│   └── architecture/
+│       └── zero_trust_cpp_gauntlet_architecture.md # Foundational Gauntlet Whitepaper
 │
-├── .antigravity/                                 # Orchestration & Agent Tooling
-│   ├── gauntlet_graph.py                         # Master execution graph
-│   └── prompts/                                  # Canonical subagent role prompts
+├── .antigravity/                                 # Agent Policies & Memory Tooling
+│   ├── safety_policies.json                      # Agent permission boundaries
+│   ├── memory/                                   # Anti-pattern Graveyard RAG utility
+│   └── prompts/                                  # Symlinks to canonical codex/prompts/
 │
-├── traps/                                        # Reference Verification Traps (CMake sample)
+├── traps/                                        # Deterministic Verification Traps
 │   ├── sanitize_matrix.sh                        # Multi-pass sanitizer runner (ASan, TSan, MSan)
-│   ├── mutation_gate.py                          # Mutation testing auditor
-│   └── cartographer_delta.py                     # Metric delta comparator
+│   ├── mutation_gate.py                          # Dual-gate mutation testing auditor (The Mimic)
+│   ├── fuzz_gate.py                              # Continuous & bounded fuzz gate (The Beholder)
+│   ├── performance_auditor.py                    # Benchmark & allocation auditor (The Quartermaster)
+│   └── cartographer_delta.py                     # Layout metric delta comparator (The Cartographer)
 │
-├── src/                                          # Reference C++ HarfBuzz Engine (CMake sample)
-└── tests/                                        # Reference Test Suites
+└── tests/                                        # Framework & Codex Integrity Test Suites
+    ├── test_keeper_runner.py                     # State machine, circuit breaker, and gate tests
+    └── test_codex_integrity.py                   # Constitutional hygiene and prompt sync tests
 ```
+

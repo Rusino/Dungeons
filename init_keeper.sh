@@ -162,6 +162,12 @@ if [ "${CLEAN}" = true ]; then
         "state_machine.py"
         ".orchestrator_state.json"
         ".orchestrator.state"
+        ".antigravity/gauntlet_graph.py"
+        ".antigravity/gauntlet_graph.go"
+        ".antigravity/memory/graveyard_query.go"
+        "traps/cartographer_delta.go"
+        "traps/mutation_gate.go"
+        "traps/performance_auditor.go"
     )
     CLEANED_COUNT=0
     for leg_file in "${LEGACY_FILES[@]}"; do

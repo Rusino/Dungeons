@@ -1,0 +1,1 @@
+../../codex/prompts/beholder_system.md

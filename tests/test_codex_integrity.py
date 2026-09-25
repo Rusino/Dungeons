@@ -79,6 +79,42 @@ class TestCodexIntegrity(unittest.TestCase):
             self.assertIn("BUILD.gn", text, f"{name} must explicitly declare BUILD.gn policy")
             self.assertIn("compiler flags", text.lower(), f"{name} must explicitly forbid altering compiler flags")
 
+    def test_antigravity_prompts_synced_with_codex(self):
+        """Verifies that .antigravity/prompts/ contains the exact same prompts as codex/prompts/ without drift."""
+        antigravity_prompts_dir = Path(__file__).parent.parent / ".antigravity" / "prompts"
+        self.assertTrue(antigravity_prompts_dir.exists(), ".antigravity/prompts/ directory missing")
+
+        codex_files = {p.name: p for p in PROMPTS_DIR.glob("*.md")}
+        ag_files = {p.name: p for p in antigravity_prompts_dir.glob("*.md")}
+
+        self.assertEqual(
+            set(codex_files.keys()),
+            set(ag_files.keys()),
+            f"Prompt file set mismatch between codex/prompts and .antigravity/prompts. "
+            f"Missing in .antigravity: {set(codex_files.keys()) - set(ag_files.keys())}",
+        )
+
+        for name, codex_path in codex_files.items():
+            ag_path = ag_files[name]
+            self.assertEqual(
+                codex_path.read_text(encoding="utf-8"),
+                ag_path.read_text(encoding="utf-8"),
+                f"Content drift detected between codex/prompts/{name} and .antigravity/prompts/{name}",
+            )
+
+    def test_no_toy_engine_leaks_in_skills_or_codex(self):
+        """Verifies that reusable skills and codex files contain no hardcoded references to removed toy C++ files."""
+        skills_dir = Path(__file__).parent.parent / ".agents" / "skills"
+        check_files = list(skills_dir.rglob("*.md")) + [AGENTS_MD, CODEX_DIR / "TEXT_DOMAIN.md"] + list(PROMPTS_DIR.glob("*.md"))
+        for f in check_files:
+            text = f.read_text(encoding="utf-8")
+            self.assertNotIn(
+                "text_shaper",
+                text,
+                f"Hardcoded toy target 'text_shaper' leaked in reusable artifact: {f.name}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
+

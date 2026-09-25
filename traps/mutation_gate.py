@@ -263,9 +263,9 @@ def run_mutation_engine(
                 continue
 
             if b_res.returncode != 0:
-                print(f"  [+] KILLED by Compiler: Mutant produced build failure.")
-                mutant.status = "KILLED"
-                killed_count += 1
+                print(f"  [-] STILLBORN by Compiler: Mutant produced build failure (excluded from score).")
+                mutant.status = "STILLBORN"
+                stillborn_count += 1
                 continue
 
             # 2. Test Execution
@@ -315,8 +315,18 @@ def run_mutation_engine(
 
     print("\n" + "=" * 60)
     print(f"🛡️  THE MIMIC MUTATION SCORE: {score:.1f}%")
-    print(f"    Total Evaluated: {total_evaluated} | Killed: {killed_count} | Survived: {survived_count}")
+    print(
+        f"    Total Evaluated: {total_evaluated} | Killed: {killed_count} | "
+        f"Survived: {survived_count} | Stillborn: {stillborn_count}"
+    )
     print("=" * 60)
+
+    if total_evaluated == 0 and stillborn_count > 0:
+        if strict:
+            print("[FAIL] The Mimic: All generated mutants failed compilation (0 viable mutants evaluated).")
+            return 1
+        print("[!] Warning: All generated mutants were stillborn (failed compilation).")
+        return 0
 
     if score < threshold:
         print(f"[FAIL] The Mimic rejected the test suite: Mutation score {score:.1f}% < required {threshold:.1f}%.")

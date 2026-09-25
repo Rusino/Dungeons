@@ -226,8 +226,51 @@ class KeeperRunner:
         """Persists state to configured state file."""
         state_path = self.work_dir / self.state_file
         state_path.parent.mkdir(parents=True, exist_ok=True)
+        gitignore_path = state_path.parent / ".gitignore"
+        if state_path.parent.name == ".keeper" and not gitignore_path.exists():
+            gitignore_path.write_text("*\n", encoding="utf-8")
         with open(state_path, "w", encoding="utf-8") as f:
             json.dump(self.state, f, indent=2)
+
+    def _get_git_head(self) -> Optional[str]:
+        """Returns the current git HEAD commit hash, or None if not in a valid repo."""
+        try:
+            res = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.work_dir,
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            return res.stdout.strip()
+        except subprocess.CalledProcessError:
+            return None
+
+    def _rollback_working_tree(self, pre_head: Optional[str] = None):
+        """Reverts tracked, staged, and untracked modifications back to pre_head."""
+        if pre_head:
+            cur_head = self._get_git_head()
+            if cur_head and cur_head != pre_head:
+                subprocess.run(
+                    ["git", "reset", "--soft", pre_head],
+                    cwd=self.work_dir,
+                    capture_output=True,
+                )
+        subprocess.run(
+            ["git", "restore", "--staged", "."],
+            cwd=self.work_dir,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "restore", "."],
+            cwd=self.work_dir,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "clean", "-fd", "-e", ".keeper/"],
+            cwd=self.work_dir,
+            capture_output=True,
+        )
 
     def reset_state(self):
         """Resets the state machine back to initial phase."""
@@ -282,13 +325,13 @@ class KeeperRunner:
             return 0
 
     def check_forbidden_paths(self, phase_name: str, forbidden_patterns: List[str]):
-        """Asserts that no modified or staged files match forbidden path patterns."""
+        """Asserts that no modified, staged, or untracked files match forbidden path patterns."""
         if not forbidden_patterns:
             return
 
         try:
             res = subprocess.run(
-                ["git", "status", "--porcelain"],
+                ["git", "status", "--porcelain", "-uall"],
                 cwd=self.work_dir,
                 capture_output=True,
                 text=True,
@@ -305,8 +348,11 @@ class KeeperRunner:
                 for pat in forbidden_patterns:
                     # Strip leading wildcards for matching
                     clean_pat = pat.lstrip("/")
-                    if fnmatch.fnmatch(file_path, clean_pat) or fnmatch.fnmatch(
-                        file_path, f"*/{clean_pat}"
+                    prefix_dir = clean_pat[:-2] if clean_pat.endswith("/**") else None
+                    if (
+                        fnmatch.fnmatch(file_path, clean_pat)
+                        or fnmatch.fnmatch(file_path, f"*/{clean_pat}")
+                        or (prefix_dir and file_path.startswith(prefix_dir))
                     ):
                         raise CircuitBreakerException(
                             f"Scope Guard Violation! Subagent touched forbidden path: {file_path} (Matches pattern: {pat})"
@@ -366,9 +412,19 @@ class KeeperRunner:
 
             if r_res.returncode == 0:
                 return False, "Ghost Test Detected! Gate A requires the test to FAIL on current code, but it passed."
-            if r_res.returncode != expected_exit and expected_exit != -1:
-                return True, f"Defect caught! Test failed with returncode {r_res.returncode} (Gate A certified)."
-            return True, f"Defect caught! Test returned expected code {r_res.returncode}."
+            if r_res.returncode in (126, 127):
+                return (
+                    False,
+                    f"Gate A test command invocation failed with shell exit code {r_res.returncode} "
+                    f"(command not found or not executable: '{run_cmd}').\nStderr:\n{r_res.stderr[:300]}",
+                )
+            if expected_exit not in (-1, 1) and r_res.returncode != expected_exit:
+                return (
+                    False,
+                    f"Gate A test exited with unexpected code {r_res.returncode} (expected {expected_exit}).\n"
+                    f"Stderr:\n{r_res.stderr[:300]}",
+                )
+            return True, f"Defect caught! Test failed with returncode {r_res.returncode} (Gate A certified)."
 
         elif gate_type == "gate_b":
             # Gate B: MUST build (0) AND test MUST PASS (0) on refactored code
@@ -805,12 +861,23 @@ class KeeperRunner:
                     Colors.YELLOW,
                 )
 
+                pre_head = self._get_git_head()
+
                 # Dispatch worker
                 try:
                     asyncio.run(self.dispatch_phase_worker(phase, error_feedback=error_feedback))
                 except Exception as e:
                     log_progress(phase_name, "❌", f"Worker execution error: {e}", Colors.RED)
                     error_feedback = f"Worker runtime exception: {e}"
+
+                # Unpack any unauthorized git commits made by the worker so Scope Guard can inspect them
+                post_head = self._get_git_head()
+                if pre_head and post_head and pre_head != post_head:
+                    subprocess.run(
+                        ["git", "reset", "--soft", pre_head],
+                        cwd=self.work_dir,
+                        capture_output=True,
+                    )
 
                 # Check Circuit Breakers
                 circuit_tripped = False
@@ -820,8 +887,8 @@ class KeeperRunner:
                 except CircuitBreakerException as cb_err:
                     circuit_tripped = True
                     log_progress(phase_name, "🛑", f"Circuit Breaker Tripped! {cb_err}", Colors.RED)
-                    # Revert modifications to prevent bad state from compounding
-                    subprocess.run(["git", "restore", "."], cwd=self.work_dir)
+                    # Revert tracked, staged, and untracked modifications to prevent bad state from compounding
+                    self._rollback_working_tree(pre_head)
                     error_feedback = (
                         f"CIRCUIT BREAKER VIOLATION: {cb_err}\n"
                         f"You touched forbidden paths or exceeded diff lines. Reverted changes."
