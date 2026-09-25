@@ -398,6 +398,21 @@ class KeeperRunner:
                 if len(parts) >= 2 and parts[0].isdigit() and parts[1].isdigit():
                     total_lines += int(parts[0]) + int(parts[1])
 
+            untracked_res = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                cwd=self.work_dir,
+                capture_output=True,
+                text=True,
+            )
+            if untracked_res.returncode == 0:
+                for rel_f in untracked_res.stdout.splitlines():
+                    if rel_f.strip() and (self.work_dir / rel_f.strip()).is_file():
+                        total_lines += len(
+                            (self.work_dir / rel_f.strip())
+                            .read_text(encoding="utf-8", errors="ignore")
+                            .splitlines()
+                        )
+
             if total_lines > max_lines:
                 raise CircuitBreakerException(
                     f"Blast Radius Exceeded! Diff is {total_lines} lines (maximum allowed: {max_lines})."
@@ -449,7 +464,7 @@ class KeeperRunner:
         """
         try:
             diff_res = subprocess.run(
-                ["git", "diff", "HEAD"],
+                ["git", "diff", "HEAD", "--relative"],
                 cwd=self.work_dir,
                 capture_output=True,
                 text=True,
@@ -457,12 +472,30 @@ class KeeperRunner:
             diff_text = diff_res.stdout
             if diff_res.returncode != 0:
                 diff_res2 = subprocess.run(
-                    ["git", "diff"],
+                    ["git", "diff", "--relative"],
                     cwd=self.work_dir,
                     capture_output=True,
                     text=True,
                 )
                 diff_text = diff_res2.stdout
+
+            untracked_res = subprocess.run(
+                ["git", "ls-files", "--others", "--exclude-standard"],
+                cwd=self.work_dir,
+                capture_output=True,
+                text=True,
+            )
+            if untracked_res.returncode == 0:
+                for rel_f in untracked_res.stdout.splitlines():
+                    rel_f_clean = rel_f.strip()
+                    if rel_f_clean and (self.work_dir / rel_f_clean).is_file():
+                        file_lines = (
+                            (self.work_dir / rel_f_clean)
+                            .read_text(encoding="utf-8", errors="ignore")
+                            .splitlines()
+                        )
+                        diff_text += f"\n+++ b/{rel_f_clean}\n"
+                        diff_text += "\n".join(f"+{ln}" for ln in file_lines)
 
             current_file = ""
             disallowed_constructs = [

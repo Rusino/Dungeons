@@ -176,7 +176,7 @@ def evaluate_pre_tool_use(payload: Dict[str, Any], cwd: Optional[Path] = None) -
             "git push --force",
             "git commit --no-verify",
         ]
-        if any(pat in cmd for pat in destructive_patterns) or re.search(r"(?:sed\s+-i|>\s*(?:src/|include/))", cmd):
+        if any(pat in cmd for pat in destructive_patterns) or re.search(r"(?:sed\s+-i|>\s*(?:src/|include/|tests/|traps/))", cmd):
             return {
                 "decision": "force_ask",
                 "reason": (
@@ -235,7 +235,7 @@ def evaluate_stop(payload: Dict[str, Any], cwd: Optional[Path] = None) -> Dict[s
     # 1. Run git diff check if in a git repo
     try:
         diff_res = subprocess.run(
-            ["git", "diff", "HEAD"],
+            ["git", "diff", "HEAD", "--relative"],
             cwd=str(ws),
             capture_output=True,
             text=True,
@@ -243,12 +243,25 @@ def evaluate_stop(payload: Dict[str, Any], cwd: Optional[Path] = None) -> Dict[s
         diff_text = diff_res.stdout
         if diff_res.returncode != 0:
             diff_res2 = subprocess.run(
-                ["git", "diff"],
+                ["git", "diff", "--relative"],
                 cwd=str(ws),
                 capture_output=True,
                 text=True,
             )
             diff_text = diff_res2.stdout
+
+        untracked_res = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=str(ws),
+            capture_output=True,
+            text=True,
+        )
+        if untracked_res.returncode == 0:
+            for rel_f in untracked_res.stdout.splitlines():
+                rel_f_clean = rel_f.strip()
+                if rel_f_clean and (ws / rel_f_clean).is_file():
+                    diff_text += f"\n+++ b/{rel_f_clean}\n"
+                    diff_text += "\n".join(f"+{ln}" for ln in (ws / rel_f_clean).read_text(encoding="utf-8", errors="ignore").splitlines())
 
         current_file = ""
         for line in diff_text.splitlines():

@@ -237,6 +237,59 @@ class TestKeeperHook(unittest.TestCase):
         resp2 = _run_hook_cli("stop", payload, self.work_dir)
         self.assertEqual(resp2.get("decision"), "stop")
 
+    def test_pre_tool_use_blocks_shell_redirect_to_tests_and_traps(self):
+        """Red-team test: pre_tool_use must block shell redirection to tests/ and traps/."""
+        payload1 = {
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "CommandLine": "cat << 'EOF' > tests/test_hack.py\nprint(1)\nEOF",
+                },
+            },
+            "workspacePaths": [str(self.work_dir)],
+        }
+        res1 = _run_hook_cli("pre_tool_use", payload1, self.work_dir)
+        self.assertEqual(res1.get("decision"), "force_ask")
+
+        payload2 = {
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "CommandLine": "echo 'x' > traps/bypass.py",
+                },
+            },
+            "workspacePaths": [str(self.work_dir)],
+        }
+        res2 = _run_hook_cli("pre_tool_use", payload2, self.work_dir)
+        self.assertEqual(res2.get("decision"), "force_ask")
+
+    def test_stop_hook_catches_untracked_and_monorepo_subdir_violations(self):
+        """Red-team test: stop hook must catch unmarked TODO in untracked files in monorepo subdirectories."""
+        import subprocess
+
+        root = self.work_dir
+        subprocess.run(["git", "init"], cwd=str(root), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "trapsmith@keeper.test"], cwd=str(root), check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "The Trapsmith"], cwd=str(root), check=True, capture_output=True)
+
+        subdir = root / "tools" / "editor"
+        subdir.mkdir(parents=True, exist_ok=True)
+        readme = subdir / "README.md"
+        readme.write_text("# Readme\n", encoding="utf-8")
+
+        subprocess.run(["git", "add", "."], cwd=str(root), check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=str(root), check=True, capture_output=True)
+
+        # Create an untracked file in monorepo subdirectory containing // TODO: fix later
+        src_dir = subdir / "src"
+        src_dir.mkdir(parents=True, exist_ok=True)
+        untracked_file = src_dir / "untracked_todo.cpp"
+        untracked_file.write_text("// TODO: fix later\n", encoding="utf-8")
+
+        res = _run_hook_cli("stop", {"workspacePaths": [str(subdir)], "executionNum": 1}, subdir)
+        self.assertEqual(res.get("decision"), "continue")
+        self.assertIn("Unmarked TODO", res.get("reason", ""))
+
 
 if __name__ == "__main__":
     unittest.main()

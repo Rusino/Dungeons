@@ -659,6 +659,75 @@ class TestKeeperRunner(unittest.TestCase):
             runner.check_code_traces("Phase 6")
         self.assertIn("GTEST_SKIP", str(ctx.exception))
 
+    def test_check_code_traces_catches_untracked_and_monorepo_subdir_files(self):
+        """Red-team test: check_code_traces must inspect untracked files and monorepo subdirectories."""
+        import subprocess
+        import shutil
+
+        subprocess.run(["git", "init"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.work_dir, capture_output=True, check=True)
+
+        subdir = self.work_dir / "tools" / "editor"
+        subdir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(self.work_dir / "keeper.yaml", subdir / "keeper.yaml")
+
+        clean_cpp = subdir / "src" / "clean.cpp"
+        clean_cpp.parent.mkdir(parents=True, exist_ok=True)
+        clean_cpp.write_text("int main() { return 0; }\n", encoding="utf-8")
+
+        subprocess.run(["git", "add", "."], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=self.work_dir, capture_output=True, check=True)
+
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(subdir))
+
+        # Sub-case A (Tracked file in monorepo subdirectory)
+        clean_cpp.write_text("int main() { return 0; }\n// TODO: unmarked todo\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("Unmarked TODO", str(ctx.exception))
+
+        # Restore clean.cpp
+        subprocess.run(["git", "checkout", "--", "."], cwd=str(subdir), capture_output=True, check=True)
+
+        # Sub-case B (Untracked new file in src/)
+        untracked_bad = subdir / "src" / "untracked_bad.cpp"
+        untracked_bad.write_text("void* p = reinterpret_cast<void*>(1);\n", encoding="utf-8")
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_code_traces("Phase 6")
+        self.assertIn("reinterpret_cast", str(ctx.exception))
+
+    def test_check_blast_radius_counts_untracked_files(self):
+        """Red-team test: check_blast_radius must account for added lines in untracked files."""
+        import subprocess
+        import shutil
+
+        subprocess.run(["git", "init"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=self.work_dir, capture_output=True, check=True)
+
+        subdir = self.work_dir / "tools" / "editor"
+        subdir.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(self.work_dir / "keeper.yaml", subdir / "keeper.yaml")
+
+        dummy_cpp = subdir / "src" / "dummy.cpp"
+        dummy_cpp.parent.mkdir(parents=True, exist_ok=True)
+        dummy_cpp.write_text("int main() { return 0; }\n", encoding="utf-8")
+
+        subprocess.run(["git", "add", "."], cwd=self.work_dir, capture_output=True, check=True)
+        subprocess.run(["git", "commit", "-m", "init"], cwd=self.work_dir, capture_output=True, check=True)
+
+        runner = KeeperRunner(config_path="keeper.yaml", work_dir=str(subdir))
+
+        # Create an untracked file with 60 lines of valid code (> max_lines=50)
+        untracked_big = subdir / "src" / "big_new_file.cpp"
+        code_lines = "\n".join([f"int f_{i}() {{ return {i}; }}" for i in range(60)]) + "\n"
+        untracked_big.write_text(code_lines, encoding="utf-8")
+
+        with self.assertRaises(CircuitBreakerException) as ctx:
+            runner.check_blast_radius("Phase 6", max_lines=50)
+        self.assertIn("Blast Radius Exceeded", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()
