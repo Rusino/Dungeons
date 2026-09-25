@@ -184,21 +184,43 @@ class KeeperRunner:
             return
 
         text = cfg_file.read_text(encoding="utf-8")
-        build_match = re.search(r"\*\*Build Command\*\*:\s*`([^`]+)`", text)
-        if build_match:
-            self.config_vars["build_cmd"] = build_match.group(1).strip()
 
-        test_match = re.search(r"\*\*Unit Test Command\*\*:\s*`([^`]+)`", text)
-        if test_match:
-            self.config_vars["test_cmd"] = test_match.group(1).strip()
+        def _extract_cmd(inline_pattern: str, section_pattern: str) -> Optional[str]:
+            m = re.search(inline_pattern, text)
+            if m:
+                return m.group(1).strip()
+            sec = re.search(
+                rf"###\s+(?:{section_pattern})\s*\n+```(?:bash|sh)?\n([^`]+)```",
+                text,
+                re.IGNORECASE,
+            )
+            if sec:
+                lines = [
+                    ln.strip()
+                    for ln in sec.group(1).splitlines()
+                    if ln.strip() and not ln.strip().startswith("#")
+                ]
+                if lines:
+                    return " && ".join(lines)
+            return None
 
-        asan_match = re.search(r"ASan\+UBSan Command:\s*`([^`]+)`", text)
-        if asan_match:
-            self.config_vars["sanitizer_cmd"] = asan_match.group(1).strip()
+        build_cmd = _extract_cmd(r"\*\*Build Command\*\*:\s*`([^`]+)`", r"Build Command")
+        if build_cmd:
+            self.config_vars["build_cmd"] = build_cmd
 
-        fuzz_match = re.search(r"\*\*Fuzz(?:ing)? Command\*\*:\s*`([^`]+)`", text)
-        if fuzz_match:
-            self.config_vars["fuzz_cmd"] = fuzz_match.group(1).strip()
+        test_cmd = _extract_cmd(
+            r"\*\*(?:Unit )?Test Command\*\*:\s*`([^`]+)`", r"(?:Unit )?Test Command"
+        )
+        if test_cmd:
+            self.config_vars["test_cmd"] = test_cmd
+
+        asan_cmd = _extract_cmd(r"ASan\+UBSan Command:\s*`([^`]+)`", r"Sanitizer(?:s| Matrix)?")
+        if asan_cmd:
+            self.config_vars["sanitizer_cmd"] = asan_cmd
+
+        fuzz_cmd = _extract_cmd(r"\*\*Fuzz(?:ing)? Command\*\*:\s*`([^`]+)`", r"Fuzz(?:ing)? Command")
+        if fuzz_cmd:
+            self.config_vars["fuzz_cmd"] = fuzz_cmd
 
     def _load_state(self) -> Dict[str, Any]:
         """Loads state from configured state file or initializes default state."""
@@ -267,7 +289,31 @@ class KeeperRunner:
             capture_output=True,
         )
         subprocess.run(
-            ["git", "clean", "-fd", "-e", ".keeper/"],
+            [
+                "git",
+                "clean",
+                "-fd",
+                "-e",
+                ".keeper/",
+                "-e",
+                "AGENTS.md",
+                "-e",
+                "INVARIANTS.md",
+                "-e",
+                "KEEPER_CONFIG.md",
+                "-e",
+                "keeper",
+                "-e",
+                "keeper.yaml",
+                "-e",
+                "traps",
+                "-e",
+                "fuzz/",
+                "-e",
+                ".agents/",
+                "-e",
+                ".antigravity/",
+            ],
             cwd=self.work_dir,
             capture_output=True,
         )

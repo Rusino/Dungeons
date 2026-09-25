@@ -307,6 +307,33 @@ else
     cp -r "${SCRIPT_DIR}/.agents/skills/"* "${SKILLS_DEST}/"
 fi
 
+# 10. Configure Local Git Exclude (.git/info/exclude) for External Repositories
+if [ "${TARGET_DIR}" != "${SCRIPT_DIR}" ] && git -C "${TARGET_DIR}" rev-parse --git-dir >/dev/null 2>&1; then
+    GIT_COMMON_DIR="$(cd "${TARGET_DIR}" && cd "$(git rev-parse --git-common-dir)" && pwd)"
+    GIT_PREFIX="$(git -C "${TARGET_DIR}" rev-parse --show-prefix)"
+    EXCLUDE_FILE="${GIT_COMMON_DIR}/info/exclude"
+    mkdir -p "$(dirname "${EXCLUDE_FILE}")"
+    touch "${EXCLUDE_FILE}"
+    MARKER="# Project KEEPER (${GIT_PREFIX:-root})"
+    if ! grep -Fq "${MARKER}" "${EXCLUDE_FILE}"; then
+        echo "==> Registering KEEPER artifacts in local Git exclude (${EXCLUDE_FILE})..."
+        {
+            echo ""
+            echo "${MARKER}"
+            echo "/${GIT_PREFIX}AGENTS.md"
+            echo "/${GIT_PREFIX}INVARIANTS.md"
+            echo "/${GIT_PREFIX}KEEPER_CONFIG.md"
+            echo "/${GIT_PREFIX}keeper"
+            echo "/${GIT_PREFIX}keeper.yaml"
+            echo "/${GIT_PREFIX}traps"
+            echo "/${GIT_PREFIX}fuzz/"
+            echo "/${GIT_PREFIX}.agents/"
+            echo "/${GIT_PREFIX}.antigravity/"
+            echo "/${GIT_PREFIX}.keeper/"
+        } >> "${EXCLUDE_FILE}"
+    fi
+fi
+
 echo "=================================================================="
 echo "✅ Project KEEPER successfully bootstrapped in: ${TARGET_DIR}"
 echo "   - Tier 1 Constitution: ${TARGET_DIR}/AGENTS.md $([ "${USE_LINK}" = true ] && echo "(symlinked to Dungeons)" || echo "(copied)")"
